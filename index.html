@@ -94,6 +94,7 @@
     location.replace('reset.html' + location.hash);
   }
 </script>
+
   <!-- Header -->
   <header>
     <div class="container nav">
@@ -484,21 +485,28 @@ async function getMyProfile(userId) {
 
   // 3) FORM HANDLERS
 
-  // ADMIN
+// ADMIN (with debug)
 const adminForm = document.querySelector("#adminTab form.login");
 if (adminForm) adminForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const email = document.getElementById("aemail").value.trim();
   const pass  = document.getElementById("apass").value;
+
   try {
+    console.log("Trying signInWithPassword for:", JSON.stringify(email), "len:", email.length);
     const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
-    if (error) throw error;
-    const user = data.user;
+    console.log("signIn result:", { data, error }); // <- will show the exact reason if it fails
+
+    if (error) throw error;           // e.g., "Invalid login credentials"
+    const user = data.user;           // returned user (avoid getUser() race)
     const p = await getMyProfile(user.id);
     if (p.role !== "admin") throw new Error("This user is not an admin");
-    goRole(p.role);
-  } catch (err) { showErr("adminError", err); }
+    goRole(p.role);                   // redirect to admin-dashboard.html
+  } catch (err) {
+    showErr("adminError", err);       // shows red text above the form
+  }
 });
+
 
 
 // ACCOUNTS
