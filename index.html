@@ -88,6 +88,12 @@
   </style>
 </head>
 <body>
+<script>
+  // If a password recovery link lands on index.html with a hash, forward it to reset.html
+  if (location.hash && location.hash.includes('type=recovery')) {
+    location.replace('reset.html' + location.hash);
+  }
+</script>
   <!-- Header -->
   <header>
     <div class="container nav">
