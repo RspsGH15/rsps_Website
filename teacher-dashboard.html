@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RSPS — Teacher</title>
+<style>
+  body{font-family:system-ui;margin:0;background:#f8fafc;color:#111827}
+  header{background:#0b6ef3;color:#fff;padding:12px 16px}
+  .container{max-width:1100px;margin:0 auto;padding:16px}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:14px}
+  input,textarea,button,select{padding:10px;border-radius:10px;border:1px solid #d1d5db;font-size:14px;width:100%}
+  button{background:#0b6ef3;color:#fff;border:0;cursor:pointer;width:auto}
+  .grid{display:grid;gap:12px;grid-template-columns:1fr 1fr}
+  @media(max-width:860px){.grid{grid-template-columns:1fr}}
+  .muted{color:#64748b;font-size:13px}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:left;font-size:14px;vertical-align:top}
+  th{background:#f1f5f9}
+</style>
+</head>
+<body>
+<header>
+  <div class="container">
+    <strong>Teacher Dashboard</strong>
+    <span id="who" class="muted"></span>
+    <button id="logout" style="float:right">Logout</button>
+  </div>
+</header>
+
+<main class="container">
+  <div class="grid">
+    <!-- Post Homework -->
+    <div class="card">
+      <h3>Post Homework</h3>
+      <label>Class</label>
+      <select id="hwClass"></select>
+      <label>Subject</label>
+      <input id="hwSubject" placeholder="e.g., Mathematics" />
+      <label>Content</label>
+      <textarea id="hwContent" placeholder="Homework details"></textarea>
+      <label>Due date</label>
+      <input id="hwDue" type="date" />
+      <button id="hwSave">Save Homework</button>
+      <p id="hwMsg" class="muted"></p>
+    </div>
+
+    <!-- Message a Parent -->
+    <div class="card">
+      <h3>Message a Parent</h3>
+      <label>Student (from your classes)</label>
+      <select id="msgStudent"></select>
+      <label>Subject</label>
+      <input id="msgSubject" placeholder="Subject" />
+      <label>Message</label>
+      <textarea id="msgBody" placeholder="Write your message"></textarea>
+      <button id="msgSend">Send Message</button>
+      <p id="msgOut" class="muted"></p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Recent Homework</h3>
+    <table>
+      <thead><tr><th>Class</th><th>Subject</th><th>Due</th><th>Content</th></tr></thead>
+      <tbody id="hwList"></tbody>
+    </table>
+  </div>
+</main>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script>
+  const sb = supabase.createClient(
+    "https://eqbbddsjutlupckqzlpq.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmJkZHNqdXRsdXBja3F6bHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDkzOTMsImV4cCI6MjA3MDIyNTM5M30.CVmsiBCCp98ZQQOEe-1QgrvcJGeRP4DGHUx6j0wPCRI"
+  );
+
+  let me = null;
+
+  async function ensureRole(roleNeeded){
+    const { data: { user } } = await sb.auth.getUser();
+    if(!user){ location.href='index.html#login'; return; }
+    const { data: p, error } = await sb.from('profiles').select('full_name, role').eq('user_id', user.id).single();
+    if(error || !p || p.role !== roleNeeded){ alert('Access denied'); location.href='index.html'; return; }
+    document.getElementById('who').textContent = ` | ${p.full_name} (${p.role})`;
+    me = user;
+  }
+
+  document.getElementById('logout').onclick = async ()=>{ await sb.auth.signOut(); location.href='index.html#login'; };
+
+  // Load teacher classes + recent homework
+  async function loadClasses(){
+    const { data: classes } = await sb.from('classes').select('id,name').order('name');
+    const sel = document.getElementById('hwClass');
+    (classes||[]).forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o); });
+  }
+  async function loadStudentsForMessages(){
+    // teachers can read students; class teacher can update class students
+    const { data: studs } = await sb.from('students').select('id, full_name').order('full_name');
+    const sel = document.getElementById('msgStudent');
+    (studs||[]).forEach(s=>{ const o=document.createElement('option'); o.value=s.id; o.textContent=s.full_name; sel.appendChild(o); });
+  }
+  async function loadRecentHomework(){
+    const { data: list } = await sb.from('homework').select('class_id, subject, content, due_date').order('created_at',{ascending:false}).limit(20);
+    const { data: classes } = await sb.from('classes').select('id,name');
+    const map = Object.fromEntries((classes||[]).map(c=>[c.id,c.name]));
+    const tbody = document.getElementById('hwList'); tbody.innerHTML='';
+    (list||[]).forEach(h=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML = `<td>${map[h.class_id]||''}</td><td>${h.subject||''}</td><td>${h.due_date||''}</td><td>${h.content||''}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Save homework
+  document.getElementById('hwSave').onclick = async ()=>{
+    const class_id = document.getElementById('hwClass').value;
+    const subject  = document.getElementById('hwSubject').value.trim();
+    const content  = document.getElementById('hwContent').value.trim();
+    const due_date = document.getElementById('hwDue').value;
+    if(!class_id || !subject || !content){ document.getElementById('hwMsg').textContent='Fill all fields.'; return; }
+    const { error } = await sb.from('homework').insert({ class_id, subject, content, due_date, created_by: me.id });
+    document.getElementById('hwMsg').textContent = error ? ('Error: '+error.message) : 'Saved!';
+    if(!error) loadRecentHomework();
+  };
+
+  // Send message
+  document.getElementById('msgSend').onclick = async ()=>{
+    const student_id = document.getElementById('msgStudent').value;
+    const subject = document.getElementById('msgSubject').value.trim();
+    const body    = document.getElementById('msgBody').value.trim();
+    if(!student_id || !subject || !body){ document.getElementById('msgOut').textContent='Fill all fields.'; return; }
+    // Look up student guardian user id
+    const { data: s } = await sb.from('students').select('guardian_user_id').eq('id', student_id).single();
+    const to_guardian_user = s?.guardian_user_id || null;
+    const { error } = await sb.from('messages').insert({ from_user: me.id, to_guardian_user, student_id, subject, body });
+    document.getElementById('msgOut').textContent = error ? ('Error: '+error.message) : 'Message sent!';
+  };
+
+  (async()=>{
+    await ensureRole('teacher');
+    await loadClasses();
+    await loadStudentsForMessages();
+    await loadRecentHomework();
+  })();
+</script>
+</body>
+</html>

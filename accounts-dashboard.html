@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RSPS — Accounts</title>
+<style>
+  body{font-family:system-ui;margin:0;background:#f8fafc;color:#111827}
+  header{background:#0b6ef3;color:#fff;padding:12px 16px}
+  .container{max-width:1100px;margin:0 auto;padding:16px}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:14px}
+  input,button{padding:10px;border-radius:10px;border:1px solid #d1d5db;font-size:14px}
+  button{background:#0b6ef3;color:#fff;border:0;cursor:pointer}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .muted{color:#64748b;font-size:13px}
+  .right{margin-left:auto}
+</style>
+</head>
+<body>
+<header>
+  <div class="container">
+    <strong>Accounts Dashboard</strong>
+    <span id="who" class="muted"></span>
+    <button id="logout" class="right">Logout</button>
+  </div>
+</header>
+
+<main class="container">
+  <!-- Quick Fees Console (Demo only) -->
+  <div class="card">
+    <h3>Quick Fees Console (Demo)</h3>
+    <div class="row">
+      <div>
+        <label>Admission No.</label><br/>
+        <input id="acctAdm" placeholder="RSPS/2025/0123" />
+      </div>
+      <div>
+        <label>Month</label><br/>
+        <input id="acctMonth" placeholder="e.g., July 2025" />
+      </div>
+      <div>
+        <label>Amount (₹)</label><br/>
+        <input id="acctAmount" type="number" min="0" step="1" placeholder="1200" />
+      </div>
+      <div>
+        <label>Mode</label><br/>
+        <input id="acctMode" placeholder="UPI / NEFT / CASH" />
+      </div>
+      <div>
+        <label>UTR/Ref (optional)</label><br/>
+        <input id="acctUtr" placeholder="Bank ref no." />
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="btnRecord">Record Payment (Demo)</button>
+      <button id="btnReceipt">Generate Receipt (Demo)</button>
+    </div>
+    <p class="muted">Note: Front-end demo only. We’ll wire real invoices/payments next.</p>
+  </div>
+
+  <!-- Coming soon panels -->
+  <div class="card">
+    <h3>Shortcuts</h3>
+    <ul>
+      <li>Create monthly invoices (coming soon)</li>
+      <li>View discount requests (coming soon)</li>
+      <li>Send fee due reminders (coming soon)</li>
+    </ul>
+  </div>
+</main>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script>
+  const sb = supabase.createClient(
+    "https://eqbbddsjutlupckqzlpq.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmJkZHNqdXRsdXBja3F6bHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDkzOTMsImV4cCI6MjA3MDIyNTM5M30.CVmsiBCCp98ZQQOEe-1QgrvcJGeRP4DGHUx6j0wPCRI"
+  );
+
+  async function ensureRole(roleNeeded){
+    const { data: { user } } = await sb.auth.getUser();
+    if(!user){ location.href='index.html#login'; return; }
+    const { data: p, error } = await sb.from('profiles').select('full_name, role').eq('user_id', user.id).single();
+    if(error || !p || p.role !== roleNeeded){ alert('Access denied'); location.href='index.html'; return; }
+    document.getElementById('who').textContent = ` | ${p.full_name} (${p.role})`;
+  }
+
+  document.getElementById('logout').onclick = async () => { await sb.auth.signOut(); location.href='index.html#login'; };
+
+  // Demo buttons
+  document.getElementById('btnRecord').onclick = ()=>alert('Demo: Payment recorded (not saved).');
+  document.getElementById('btnReceipt').onclick = ()=>alert('Demo: Receipt PDF generated.');
+
+  ensureRole('accounts');
+</script>
+</body>
+</html>

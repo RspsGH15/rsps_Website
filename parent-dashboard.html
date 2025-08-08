@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>RSPS — Parent</title>
+<style>
+  body{font-family:system-ui;margin:0;background:#f8fafc;color:#111827}
+  header{background:#0b6ef3;color:#fff;padding:12px 16px}
+  .container{max-width:1100px;margin:0 auto;padding:16px}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:14px}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:left;font-size:14px;vertical-align:top}
+  th{background:#f1f5f9}
+  .muted{color:#64748b;font-size:13px}
+  button{padding:8px 10px;border-radius:10px;border:1px solid #d1d5db;background:#0b6ef3;color:#fff;cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <div class="container">
+    <strong>Parent Dashboard</strong>
+    <span id="who" class="muted"></span>
+    <button id="logout" style="float:right">Logout</button>
+  </div>
+</header>
+
+<main class="container">
+  <div class="card">
+    <h3>Homework (Your Ward’s Class)</h3>
+    <table>
+      <thead><tr><th>Subject</th><th>Due</th><th>Content</th></tr></thead>
+      <tbody id="hw"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Fees (Invoices)</h3>
+    <table>
+      <thead><tr><th>Month</th><th>Tuition</th><th>Transport</th><th>Other</th><th>Discount</th><th>Status</th></tr></thead>
+      <tbody id="fees"></tbody>
+    </table>
+    <p class="muted">Payments page coming soon. For now, please pay via QR/UPI and share receipt to school WhatsApp.</p>
+  </div>
+
+  <div class="card">
+    <h3>Messages</h3>
+    <table>
+      <thead><tr><th>From</th><th>Subject</th><th>Message</th><th>Time</th></tr></thead>
+      <tbody id="msgs"></tbody>
+    </table>
+  </div>
+</main>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script>
+  const sb = supabase.createClient(
+    "https://eqbbddsjutlupckqzlpq.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmJkZHNqdXRsdXBja3F6bHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDkzOTMsImV4cCI6MjA3MDIyNTM5M30.CVmsiBCCp98ZQQOEe-1QgrvcJGeRP4DGHUx6j0wPCRI"
+  );
+
+  let me = null, myStudentId = null, myClassId = null;
+
+  async function ensureRole(roleNeeded){
+    const { data: { user } } = await sb.auth.getUser();
+    if(!user){ location.href='index.html#login'; return; }
+    const { data: p, error } = await sb.from('profiles').select('full_name, role').eq('user_id', user.id).single();
+    if(error || !p || p.role !== roleNeeded){ alert('Access denied'); location.href='index.html'; return; }
+    document.getElementById('who').textContent = ` | ${p.full_name} (${p.role})`;
+    me = user;
+  }
+
+  document.getElementById('logout').onclick = async ()=>{ await sb.auth.signOut(); location.href='index.html#login'; };
+
+  async function findWard(){
+    // Parent can only see their own ward due to RLS
+    const { data: studs } = await sb.from('students').select('id, full_name, class_id').eq('guardian_user_id', me.id).limit(1);
+    if(!studs || !studs.length){ return null; }
+    myStudentId = studs[0].id; myClassId = studs[0].class_id;
+    return studs[0];
+  }
+
+  async function loadHomework(){
+    if(!myClassId) return;
+    const { data: list } = await sb.from('homework').select('subject, content, due_date').eq('class_id', myClassId).order('created_at',{ascending:false}).limit(30);
+    const tbody = document.getElementById('hw'); tbody.innerHTML='';
+    (list||[]).forEach(h=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML = `<td>${h.subject||''}</td><td>${h.due_date||''}</td><td>${h.content||''}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function loadInvoices(){
+    if(!myStudentId) return;
+    const { data: invs } = await sb.from('invoices')
+      .select('period_month, tuition_amount, transport_amount, other_amount, discount_tuition_pct, discount_admission, discount_annual, status')
+      .eq('student_id', myStudentId)
+      .order('period_month',{ascending:false})
+      .limit(24);
+    const tbody = document.getElementById('fees'); tbody.innerHTML='';
+    (invs||[]).forEach(i=>{
+      const month = i.period_month?.slice(0,7) || '';
+      const disc = `${i.discount_tuition_pct||0}% + ₹${(i.discount_admission||0)+(i.discount_annual||0)}`;
+      const tr=document.createElement('tr');
+      tr.innerHTML = `<td>${month}</td><td>₹${i.tuition_amount||0}</td><td>₹${i.transport_amount||0}</td><td>₹${i.other_amount||0}</td><td>${disc}</td><td>${i.status}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function loadMessages(){
+    const { data: msgs } = await sb.from('messages').select('from_user, subject, body, created_at').order('created_at',{ascending:false}).limit(30);
+    // Map teacher names
+    const { data: profs } = await sb.from('profiles').select('user_id, full_name');
+    const map = Object.fromEntries((profs||[]).map(p=>[p.user_id,p.full_name]));
+    const tbody = document.getElementById('msgs'); tbody.innerHTML='';
+    (msgs||[]).forEach(m=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML = `<td>${map[m.from_user]||'Teacher'}</td><td>${m.subject||''}</td><td>${m.body||''}</td><td>${new Date(m.created_at).toLocaleString()}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  (async()=>{
+    await ensureRole('parent');
+    const ward = await findWard();
+    await loadHomework();
+    await loadInvoices();
+    await loadMessages();
+  })();
+</script>
+</body>
+</html>
