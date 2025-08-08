@@ -336,5 +336,105 @@
     // Year in footer
     document.getElementById('year').textContent = new Date().getFullYear();
   </script>
+  <!-- Supabase auth + role routing -->
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL  = "https://eqbbddsjutlupckqzlpq.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmJkZHNqdXRsdXBja3F6bHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDkzOTMsImV4cCI6MjA3MDIyNTM5M30.CVmsiBCCp98ZQQOEe-1QgrvcJGeRP4DGHUx6j0wPCRI";
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  // helper
+  async function supaLogin(email, password) {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data.user;
+  }
+  async function getMyProfile() {
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) throw new Error("No session");
+    const { data, error } = await sb.from("profiles").select("full_name, role").eq("user_id", user.id).single();
+    if (error) throw error;
+    return data;
+  }
+  function goRole(role) {
+    if (role === "admin")    window.location.href = "admin-dashboard.html";
+    else if (role === "accounts") window.location.href = "accounts-dashboard.html"; // placeholder
+    else if (role === "teacher")  window.location.href = "teacher-dashboard.html";  // placeholder
+    else if (role === "parent")   window.location.href = "parent-dashboard.html";   // placeholder
+    else alert("Unknown role");
+  }
+
+  // Hook forms
+  // ADMIN
+  const adminForm = document.querySelector("#adminTab form.login");
+  if (adminForm) adminForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("aemail").value;
+    const pass  = document.getElementById("apass").value;
+    try {
+      await supaLogin(email, pass);
+      const p = await getMyProfile();
+      if (p.role !== "admin") throw new Error("Not admin");
+      goRole(p.role);
+    } catch (err) {
+      console.error(err);
+      document.getElementById("adminError").hidden = false;
+    }
+  });
+
+  // ACCOUNTS
+  const accountsForm = document.querySelector("#accountsTab form.login");
+  if (accountsForm) accountsForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("acctUser").value; // enter the Accounts EMAIL here
+    const pass  = document.getElementById("acctPass").value;
+    try {
+      await supaLogin(email, pass);
+      const p = await getMyProfile();
+      if (p.role !== "accounts") throw new Error("Not accounts");
+      goRole(p.role);
+    } catch (err) {
+      console.error(err);
+      document.getElementById("accountsError").hidden = false;
+    }
+  });
+
+  // TEACHER
+  const teacherForm = document.querySelector("#teacherTab form.login");
+  if (teacherForm) teacherForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    // For testing, type teacher EMAIL in the Mobile box
+    const email = document.getElementById("tphone").value;
+    const pass  = document.getElementById("tpass").value;
+    try {
+      await supaLogin(email, pass);
+      const p = await getMyProfile();
+      if (p.role !== "teacher") throw new Error("Not teacher");
+      goRole(p.role);
+    } catch (err) {
+      console.error(err);
+      document.getElementById("teacherError").hidden = false;
+    }
+  });
+
+  // STUDENT tab is being used by **Parent** for testing (until we add AdmissionNo+DOB)
+  const parentForm = document.querySelector("#studentTab form.login");
+  if (parentForm) parentForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    // TEMP for testing: type PARENT email in "Parent mobile" and password in "Enter OTP"
+    const email = document.getElementById("studentPhone").value;
+    const pass  = document.getElementById("studentOtp").value;
+    try {
+      await supaLogin(email, pass);
+      const p = await getMyProfile();
+      if (p.role !== "parent") throw new Error("Not parent");
+      goRole(p.role);
+    } catch (err) {
+      console.error(err);
+      document.getElementById("studentError").hidden = false;
+    }
+  });
+</script>
+
 </body>
 </html>

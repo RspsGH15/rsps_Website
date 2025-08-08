@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RSPS — Admin Dashboard (Chats)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; background:#f8fafc; color:#111827; }
+    header { background:#0b6ef3; color:#fff; padding:12px 16px; }
+    header a { color:#fff; text-decoration:none; margin-right:12px; }
+    .container { max-width:1100px; margin:0 auto; padding:16px; }
+    .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin-bottom:14px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+    input, select, button { padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; }
+    button { background:#0b6ef3; color:#fff; border:0; cursor:pointer; }
+    button.secondary { background:#fff; color:#0b6ef3; border:1px solid #0b6ef3; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { border-bottom:1px solid #e5e7eb; text-align:left; padding:8px; font-size:14px; vertical-align:top; }
+    th { background:#f1f5f9; }
+    .small { color:#6b7280; font-size:12px; }
+    .right { margin-left:auto; }
+    .muted { color:#64748b; }
+    .nowrap { white-space:nowrap; }
+    .badge { display:inline-block; padding:2px 6px; border-radius:6px; font-size:12px; background:#eef2ff; color:#334155; }
+    .footer { text-align:center; color:#64748b; padding:12px; font-size:12px; }
+    @media (max-width: 860px){ .nowrap { white-space:normal; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <strong>Rising Stars Public School — Admin</strong>
+      <span class="small"> | View All Chats</span>
+      <a class="right" href="index.html">← Back to site</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="card">
+      <div class="row">
+        <input id="filterFrom" placeholder="Filter by FROM name" />
+        <input id="filterTo" placeholder="Filter by TO name" />
+        <input id="filterStudent" placeholder="Filter by Student name" />
+        <input id="filterSubj" placeholder="Filter by Subject" />
+        <input id="filterSince" type="date" title="Since date" />
+        <button id="btnApply">Apply Filters</button>
+        <button id="btnClear" class="secondary">Clear</button>
+        <button id="btnExport" class="secondary">Export CSV</button>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <span class="small" id="countInfo">…</span>
+        <span class="right small">
+          Page size:
+          <select id="pageSize">
+            <option>25</option><option selected>50</option><option>100</option>
+          </select>
+          <button id="prevPage" class="secondary">Prev</button>
+          <button id="nextPage" class="secondary">Next</button>
+        </span>
+      </div>
+    </div>
+
+    <div class="card">
+      <table id="tbl">
+        <thead>
+          <tr>
+            <th class="nowrap">Time</</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Student</th>
+            <th>Subject</th>
+            <th>Message</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="small muted" id="emptyState" style="display:none; padding:8px;">No messages found for these filters.</div>
+    </div>
+  </main>
+
+  <div class="footer">© <span id="yr"></span> Rising Stars Public School</div>
+
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL  = "https://eqbbddsjutlupckqzlpq.supabase.co";
+    const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmJkZHNqdXRsdXBja3F6bHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDkzOTMsImV4cCI6MjA3MDIyNTM5M30.CVmsiBCCp98ZQQOEe-1QgrvcJGeRP4DGHUx6j0wPCRI";
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+    const state = { page: 0, size: 50, lastCount: 0 };
+
+    document.getElementById('yr').textContent = new Date().getFullYear();
+
+    async function ensureAdmin() {
+      const { data: u } = await sb.auth.getUser();
+      if (!u?.user) { window.location.href = 'index.html#login'; return; }
+      const { data: prof, error } = await sb.from('profiles').select('role, full_name').eq('user_id', u.user.id).single();
+      if (error || !prof || prof.role !== 'admin') { alert('Admins only'); window.location.href='index.html'; }
+    }
+
+    function fmt(d){ return new Date(d).toLocaleString(); }
+    function csvEscape(s){ return ('"'+String(s??'').replaceAll('"','""')+'"'); }
+
+    async function fetchChats() {
+      const size = state.size, page = state.page;
+      let q = sb.from('messages')
+        .select('id, from_user, to_guardian_user, student_id, subject, body, created_at', { count: 'exact' })
+        .order('created_at', { ascending:false })
+        .range(page*size, page*size + size - 1);
+
+      const sinceVal = document.getElementById('filterSince').value;
+      if (sinceVal) q = q.gte('created_at', sinceVal);
+
+      const { data: msgs, count, error } = await q;
+      if (error) { console.error(error); alert('Error loading messages'); return { msgs: [], profilesMap:{}, studentsMap:{} }; }
+      state.lastCount = count ?? 0;
+
+      // Profiles (names/roles)
+      const { data: profs } = await sb.from('profiles').select('user_id, full_name, role');
+      const profilesMap = {};
+      (profs||[]).forEach(p => profilesMap[p.user_id] = p);
+
+      // Students
+      const { data: studs } = await sb.from('students').select('id, full_name');
+      const studentsMap = {};
+      (studs||[]).forEach(s => studentsMap[s.id] = s);
+
+      return { msgs: msgs||[], profilesMap, studentsMap };
+    }
+
+    function applyFilters(rows, maps){
+      const fFrom = document.getElementById('filterFrom').value.trim().toLowerCase();
+      const fTo   = document.getElementById('filterTo').value.trim().toLowerCase();
+      const fStu  = document.getElementById('filterStudent').value.trim().toLowerCase();
+      const fSubj = document.getElementById('filterSubj').value.trim().toLowerCase();
+
+      return rows.filter(r=>{
+        const fromName = maps.profilesMap[r.from_user]?.full_name?.toLowerCase() || '';
+        const toName   = maps.profilesMap[r.to_guardian_user]?.full_name?.toLowerCase() || '';
+        const stuName  = maps.studentsMap[r.student_id]?.full_name?.toLowerCase() || '';
+        const subj     = (r.subject||'').toLowerCase();
+        const okFrom = !fFrom || fromName.includes(fFrom);
+        const okTo   = !fTo   || toName.includes(fTo);
+        const okStu  = !fStu  || stuName.includes(fStu);
+        const okSubj = !fSubj || subj.includes(fSubj);
+        return okFrom && okTo && okStu && okSubj;
+      });
+    }
+
+    function renderTable(rows, maps){
+      const tb = document.querySelector('#tbl tbody');
+      tb.innerHTML = '';
+      if (!rows.length){ document.getElementById('emptyState').style.display='block'; return; }
+      document.getElementById('emptyState').style.display='none';
+
+      rows.forEach(r=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="nowrap">${fmt(r.created_at)}</td>
+          <td><span class="badge">${maps.profilesMap[r.from_user]?.role||''}</span> ${maps.profilesMap[r.from_user]?.full_name||'(unknown)'}</td>
+          <td><span class="badge">parent</span> ${maps.profilesMap[r.to_guardian_user]?.full_name||'(unknown)'}</td>
+          <td>${maps.studentsMap[r.student_id]?.full_name||''}</td>
+          <td>${r.subject||''}</td>
+          <td class="small">${(r.body||'').slice(0,280)}${(r.body||'').length>280?'…':''}</td>
+        `;
+        tb.appendChild(tr);
+      });
+
+      document.getElementById('countInfo').textContent = `Showing ${rows.length} of ${state.lastCount} (page ${state.page+1})`;
+    }
+
+    async function loadPage(){
+      await ensureAdmin();
+      const data = await fetchChats();
+      const filtered = applyFilters(data.msgs, data);
+      renderTable(filtered, data);
+    }
+
+    function clearFilters(){
+      ['filterFrom','filterTo','filterStudent','filterSubj','filterSince'].forEach(id => document.getElementById(id).value='');
+      state.page = 0;
+      loadPage();
+    }
+
+    function exportCSV(){
+      const rows = [...document.querySelectorAll('#tbl tbody tr')].map(tr => [...tr.children].map(td => td.innerText));
+      const header = ["Time","From","To","Student","Subject","Message"];
+      const csv = [header, ...rows].map(r => r.map(csvEscape).join(',')).join('\n');
+      const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `rsps_chats_${Date.now()}.csv`;
+      a.click();
+    }
+
+    document.getElementById('btnApply').addEventListener('click', ()=>{ state.page=0; loadPage(); });
+    document.getElementById('btnClear').addEventListener('click', clearFilters);
+    document.getElementById('btnExport').addEventListener('click', exportCSV);
+    document.getElementById('pageSize').addEventListener('change', (e)=>{ state.size = +e.target.value; state.page=0; loadPage(); });
+    document.getElementById('prevPage').addEventListener('click', ()=>{ if(state.page>0){ state.page--; loadPage(); }});
+    document.getElementById('nextPage').addEventListener('click', ()=>{ state.page++; loadPage(); });
+
+    loadPage();
+  </script>
+</body>
+</html>
