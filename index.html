@@ -447,17 +447,17 @@
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
   // 2) HELPERS
-  async function getMyProfile() {
-    const { data: { user } } = await sb.auth.getUser();
-    if (!user) throw new Error("No session");
-    const { data, error } = await sb
-      .from("profiles")
-      .select("full_name, role")
-      .eq("user_id", user.id)
-      .single();
-    if (error) throw error;
-    return data;
-  }
+async function getMyProfile(userId) {
+  const uid = userId;
+  const { data, error } = await sb
+    .from("profiles")
+    .select("full_name, role")
+    .eq("user_id", uid)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 
   function goRole(role){
     if (role === "admin")       window.location.href = "admin-dashboard.html";
@@ -479,60 +479,73 @@
   // 3) FORM HANDLERS
 
   // ADMIN
-  const adminForm = document.querySelector("#adminTab form.login");
-  if (adminForm) adminForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = document.getElementById("aemail").value.trim();
-    const pass  = document.getElementById("apass").value;
-    try {
-      await sb.auth.signInWithPassword({ email, password: pass });
-      const p = await getMyProfile();
-      if (p.role !== "admin") throw new Error("This user is not an admin");
-      goRole(p.role);
-    } catch (err) { showErr("adminError", err); }
-  });
+const adminForm = document.querySelector("#adminTab form.login");
+if (adminForm) adminForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("aemail").value.trim();
+  const pass  = document.getElementById("apass").value;
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (error) throw error;
+    const user = data.user;
+    const p = await getMyProfile(user.id);
+    if (p.role !== "admin") throw new Error("This user is not an admin");
+    goRole(p.role);
+  } catch (err) { showErr("adminError", err); }
+});
 
-  // ACCOUNTS
-  const accountsForm = document.querySelector("#accountsTab form.login");
-  if (accountsForm) accountsForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = document.getElementById("acctUser").value.trim();
-    const pass  = document.getElementById("acctPass").value;
-    try {
-      await sb.auth.signInWithPassword({ email, password: pass });
-      const p = await getMyProfile();
-      if (p.role !== "accounts") throw new Error("This user is not accounts role");
-      goRole(p.role);
-    } catch (err) { showErr("accountsError", err); }
-  });
+
+// ACCOUNTS
+const accountsForm = document.querySelector("#accountsTab form.login");
+if (accountsForm) accountsForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("acctUser").value.trim();
+  const pass  = document.getElementById("acctPass").value;
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (error) throw error;
+    const user = data.user;
+    const p = await getMyProfile(user.id);
+    if (p.role !== "accounts") throw new Error("This user is not accounts role");
+    goRole(p.role);
+  } catch (err) { showErr("accountsError", err); }
+});
+
 
   // TEACHER (for now, enter teacher EMAIL in the “Mobile” field)
-  const teacherForm = document.querySelector("#teacherTab form.login");
-  if (teacherForm) teacherForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = document.getElementById("tphone").value.trim();
-    const pass  = document.getElementById("tpass").value;
-    try {
-      await sb.auth.signInWithPassword({ email, password: pass });
-      const p = await getMyProfile();
-      if (p.role !== "teacher") throw new Error("This user is not teacher role");
-      goRole(p.role);
-    } catch (err) { showErr("teacherError", err); }
-  });
+// TEACHER (for now, enter teacher EMAIL in the “Teacher Email” field)
+const teacherForm = document.querySelector("#teacherTab form.login");
+if (teacherForm) teacherForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("tphone").value.trim();
+  const pass  = document.getElementById("tpass").value;
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (error) throw error;
+    const user = data.user;
+    const p = await getMyProfile(user.id);
+    if (p.role !== "teacher") throw new Error("This user is not teacher role");
+    goRole(p.role);
+  } catch (err) { showErr("teacherError", err); }
+});
+
 
   // PARENT (temporary: email in Parent Email field + password in Password field)
-  const parentForm = document.querySelector("#studentTab form.login");
-  if (parentForm) parentForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = document.getElementById("studentPhone").value.trim();
-    const pass  = document.getElementById("studentOtp").value;
-    try {
-      await sb.auth.signInWithPassword({ email, password: pass });
-      const p = await getMyProfile();
-      if (p.role !== "parent") throw new Error("This user is not parent role");
-      goRole(p.role);
-    } catch (err) { showErr("studentError", err); }
-  });
+const parentForm = document.querySelector("#studentTab form.login");
+if (parentForm) parentForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("studentPhone").value.trim();
+  const pass  = document.getElementById("studentOtp").value;
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (error) throw error;
+    const user = data.user;
+    const p = await getMyProfile(user.id);
+    if (p.role !== "parent") throw new Error("This user is not parent role");
+    goRole(p.role);
+  } catch (err) { showErr("studentError", err); }
+});
+
 </script>
 
 
