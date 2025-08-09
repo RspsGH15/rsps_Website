@@ -26,6 +26,7 @@
 </header>
 
 <main class="container">
+
   <!-- Quick Fees Console (Demo only) -->
   <div class="card">
     <h3>Quick Fees Console (Demo)</h3>
@@ -58,6 +59,57 @@
     <p class="muted">Note: Front-end demo only. We’ll wire real invoices/payments next.</p>
   </div>
 
+<div class="card">
+  <h3>Students — Add / Edit</h3>
+  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+    <input id="st_admission_no" placeholder="Admission Number*" />
+    <input id="st_class_section" placeholder="Class Section* (e.g., A)" />
+    <input id="st_full_name" placeholder="Student Name*" />
+    <input id="st_session" placeholder="Session* (e.g., 2026-27)" />
+    <input id="st_father_name" placeholder="Father Name*" />
+    <input id="st_mother_name" placeholder="Mother Name*" />
+    <input id="st_dob" type="date" placeholder="DOB*" />
+    <select id="st_gender">
+      <option value="">Gender*</option><option>Male</option><option>Female</option><option>Other</option>
+    </select>
+    <input id="st_aadhar" placeholder="Aadhaar (12 digits)*" />
+    <input id="st_admission_date" type="date" placeholder="Admission Date*" />
+    <select id="st_class"></select>
+    <input id="st_religion" placeholder="Religion*" />
+    <input id="st_social" placeholder="Social Category* (GEN/SC/ST/OBC/EWS...)" />
+    <input id="st_whatsapp" placeholder="WhatsApp No.*" />
+    <input id="st_father_phone" placeholder="Father Contact No.*" />
+    <input id="st_address" placeholder="Address*" style="grid-column:1/-1" />
+
+    <select id="st_transport">
+      <option value="false">Transport Availed? No</option>
+      <option value="true">Transport Availed? Yes</option>
+    </select>
+    <input id="st_buses_same" placeholder="Type 'same' if pickup & drop bus/stoppage are same" />
+    <input id="st_pickup_bus" placeholder="Pickup Bus No." />
+    <input id="st_drop_bus" placeholder="Drop Bus No." />
+    <input id="st_pickup_stop" placeholder="Pickup Stoppage" />
+    <input id="st_drop_stop" placeholder="Drop Stoppage" />
+
+    <input id="st_mother_phone" placeholder="Mother Contact No." />
+    <input id="st_neigh_phone" placeholder="Neighbour Phone" />
+    <input id="st_neigh_rel" placeholder="Neighbour Relation" />
+    <input id="st_bgroup" placeholder="Blood Group" />
+    <select id="st_has_sibling">
+      <option value="false">Real sibling in school? No</option>
+      <option value="true">Real sibling in school? Yes</option>
+    </select>
+    <input id="st_siblings" placeholder="Sibling names & classes; separate with ;" style="grid-column:1/-1" />
+
+    <input id="st_guardian_email" placeholder="(Optional) Parent portal email to link" style="grid-column:1/-1" />
+  </div>
+  <div class="row" style="margin-top:10px">
+    <button id="st_save">Save / Add</button>
+    <button id="st_clear" class="btn-outline" style="background:#fff;color:#0b6ef3;border:1px solid #0b6ef3">Clear</button>
+  </div>
+  <p id="st_msg" class="muted"></p>
+</div>
+
   <!-- Coming soon panels -->
   <div class="card">
     <h3>Shortcuts</h3>
@@ -69,7 +121,22 @@
   </div>
 </main>
 
+<!-- Students (Accounts/Admin) -->
+
+
+<div class="card">
+  <h3>All Students</h3>
+  <input id="st_search" placeholder="Search by name / Aadhaar / phone / admission no." style="margin-bottom:8px;width:100%" />
+  <table>
+    <thead>
+      <tr><th>Adm No.</th><th>Name</th><th>Class</th><th>Father</th><th>Phones</th><th>Aadhaar</th><th>Actions</th></tr>
+    </thead>
+    <tbody id="st_rows"></tbody>
+  </table>
+</div>
+
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
 <script>
   const sb = supabase.createClient(
     "https://eqbbddsjutlupckqzlpq.supabase.co",
@@ -92,5 +159,176 @@
 
   ensureRole('accounts');
 </script>
+
+
+<script>
+  // ===== Students CRUD (Accounts/Admin) =====
+  let editingId = null;
+
+  function getEl(id){ return document.getElementById(id); }
+
+  async function loadClassesForAccounts(){
+    const { data: cls } = await sb.from('classes').select('id,name').order('name');
+    const sel = getEl('st_class'); sel.innerHTML = '';
+    (cls||[]).forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o); });
+  }
+
+  async function linkGuardian(email){
+    if(!email) return null;
+    const { data: p } = await sb.from('profiles').select('user_id').eq('email', email).maybeSingle();
+    return p?.user_id || null;
+  }
+
+  function readForm(){
+    return {
+      admission_no: getEl('st_admission_no').value.trim(),
+      class_section: getEl('st_class_section').value.trim(),
+      student_name: getEl('st_full_name').value.trim(),
+      session: getEl('st_session').value.trim(),
+      father_name: getEl('st_father_name').value.trim(),
+      mother_name: getEl('st_mother_name').value.trim(),
+      dob: getEl('st_dob').value,
+      address: getEl('st_address').value.trim(),
+      gender: getEl('st_gender').value,
+      aadhar_no: getEl('st_aadhar').value.trim(),
+      admission_date: getEl('st_admission_date').value,
+      admitted_class_id: Number(getEl('st_class').value || null),
+      religion: getEl('st_religion').value.trim(),
+      social_category: getEl('st_social').value.trim(),
+      whatsapp_no: getEl('st_whatsapp').value.trim(),
+      father_contact_no: getEl('st_father_phone').value.trim(),
+      transport_availed: getEl('st_transport').value === 'true',
+      buses_same: (getEl('st_buses_same').value.trim().toLowerCase()==='same'),
+      pickup_bus_no: getEl('st_pickup_bus').value.trim(),
+      drop_bus_no: getEl('st_drop_bus').value.trim(),
+      pickup_stoppage: getEl('st_pickup_stop').value.trim(),
+      drop_stoppage: getEl('st_drop_stop').value.trim(),
+      mother_contact_no: getEl('st_mother_phone').value.trim(),
+      neighbour_contact_no: getEl('st_neigh_phone').value.trim(),
+      neighbour_relation: getEl('st_neigh_rel').value.trim(),
+      blood_group: getEl('st_bgroup').value.trim(),
+      has_sibling: getEl('st_has_sibling').value === 'true',
+      sibling_names: getEl('st_siblings').value.trim() ? getEl('st_siblings').value.trim().split(';').map(s=>s.trim()) : null,
+      sibling_classes: null,
+      govt_scheme: null,
+      guardian_email: getEl('st_guardian_email').value.trim()
+    };
+  }
+
+  function clearForm(){
+    editingId=null;
+    ['st_admission_no','st_class_section','st_full_name','st_session','st_father_name','st_mother_name','st_dob','st_address','st_gender','st_aadhar','st_admission_date','st_religion','st_social','st_whatsapp','st_father_phone','st_pickup_bus','st_drop_bus','st_pickup_stop','st_drop_stop','st_mother_phone','st_neigh_phone','st_neigh_rel','st_bgroup','st_siblings','st_guardian_email','st_buses_same'].forEach(id=>{ const el=getEl(id); if(el) el.value=''; });
+  }
+
+  async function saveStudent(){
+    const v = readForm();
+    // Required fields check
+    if(!v.admission_no || !v.class_section || !v.student_name || !v.session || !v.father_name || !v.mother_name ||
+       !v.dob || !v.address || !v.gender || !v.aadhar_no || !v.admission_date || !v.admitted_class_id ||
+       !v.religion || !v.social_category || !v.whatsapp_no || !v.father_contact_no){
+      getEl('st_msg').textContent = 'Please fill all * fields.'; return;
+    }
+
+    const guardian_user_id = await linkGuardian(v.guardian_email);
+    delete v.guardian_email;
+
+    const payload = { ...v, guardian_user_id };
+    if (v.buses_same){ payload.drop_bus_no = v.pickup_bus_no; payload.drop_stoppage = v.pickup_stoppage; }
+
+    let res;
+    if (editingId){
+      payload.updated_by = (await sb.auth.getUser()).data.user.id;
+      res = await sb.from('students').update(payload).eq('id', editingId).select().single();
+    } else {
+      payload.created_by = (await sb.auth.getUser()).data.user.id;
+      res = await sb.from('students').insert(payload).select().single();
+    }
+    getEl('st_msg').textContent = res.error ? ('Error: '+res.error.message) : 'Saved.';
+    if (!res.error){ clearForm(); await listStudents(); }
+  }
+
+  async function listStudents(){
+    const q = getEl('st_search').value.trim();
+    let req = sb.from('students').select(
+      'id, admission_no, class_section, student_name, father_name, father_contact_no, whatsapp_no, aadhar_no, admitted_class_id'
+    ).order('student_name');
+    if(q){
+      req = req.or(`student_name.ilike.%${q}%,aadhar_no.ilike.%${q}%,father_contact_no.ilike.%${q}%,whatsapp_no.ilike.%${q}%,admission_no.ilike.%${q}%`);
+    }
+    const { data: rows } = await req;
+    const { data: classes } = await sb.from('classes').select('id,name');
+    const cmap = Object.fromEntries((classes||[]).map(c=>[c.id,c.name]));
+    const tb = document.getElementById('st_rows'); tb.innerHTML='';
+    (rows||[]).forEach(r=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${r.admission_no||''}</td>
+        <td>${r.student_name}</td>
+        <td>${cmap[r.admitted_class_id]||''} (${r.class_section||''})</td>
+        <td>${r.father_name||''}</td>
+        <td>${r.father_contact_no||''}${r.whatsapp_no?(' / '+r.whatsapp_no):''}</td>
+        <td>${r.aadhar_no||''}</td>
+        <td>
+          <button data-id="${r.id}" class="editBtn">Edit</button>
+          <button data-id="${r.id}" class="delBtn" style="background:#fff;color:#0b6ef3;border:1px solid #0b6ef3">Request Delete</button>
+        </td>`;
+      tb.appendChild(tr);
+    });
+    document.querySelectorAll('.editBtn').forEach(b=>b.onclick = ()=>loadForEdit(b.dataset.id));
+    document.querySelectorAll('.delBtn').forEach(b=>b.onclick = ()=>requestDelete(b.dataset.id));
+  }
+
+  async function loadForEdit(id){
+    const { data: r } = await sb.from('students').select('*').eq('id', id).single();
+    editingId = id;
+    getEl('st_admission_no').value = r.admission_no||'';
+    getEl('st_class_section').value = r.class_section||'';
+    getEl('st_full_name').value = r.student_name||'';
+    getEl('st_session').value = r.session||'';
+    getEl('st_father_name').value = r.father_name||'';
+    getEl('st_mother_name').value = r.mother_name||'';
+    getEl('st_dob').value = r.dob||'';
+    getEl('st_address').value = r.address||'';
+    getEl('st_gender').value = r.gender||'';
+    getEl('st_aadhar').value = r.aadhar_no||'';
+    getEl('st_admission_date').value = r.admission_date||'';
+    getEl('st_class').value = r.admitted_class_id||'';
+    getEl('st_religion').value = r.religion||'';
+    getEl('st_social').value = r.social_category||'';
+    getEl('st_whatsapp').value = r.whatsapp_no||'';
+    getEl('st_father_phone').value = r.father_contact_no||'';
+    getEl('st_transport').value = r.transport_availed ? 'true' : 'false';
+    getEl('st_pickup_bus').value = r.pickup_bus_no||'';
+    getEl('st_drop_bus').value = r.drop_bus_no||'';
+    getEl('st_pickup_stop').value = r.pickup_stoppage||'';
+    getEl('st_drop_stop').value = r.drop_stoppage||'';
+    getEl('st_mother_phone').value = r.mother_contact_no||'';
+    getEl('st_neigh_phone').value = r.neighbour_contact_no||'';
+    getEl('st_neigh_rel').value = r.neighbour_relation||'';
+    getEl('st_bgroup').value = r.blood_group||'';
+    getEl('st_has_sibling').value = r.has_sibling ? 'true' : 'false';
+    getEl('st_siblings').value = (r.sibling_names||[]).join('; ');
+    getEl('st_msg').textContent = 'Editing mode — make changes and press Save.';
+  }
+
+  async function requestDelete(id){
+    const reason = prompt('Reason for delete?');
+    if (reason === null) return;
+    const { data: me } = await sb.auth.getUser();
+    const payload = { table_name:'students', row_id:id, reason, requested_by: me.user.id, status:'pending' };
+    const { error } = await sb.from('delete_requests').insert(payload);
+    alert(error ? ('Error: '+error.message) : 'Delete request sent to Admin.');
+  }
+
+  // Wire up
+  document.getElementById('st_save').onclick = saveStudent;
+  document.getElementById('st_clear').onclick = ()=>{ clearForm(); getEl('st_msg').textContent=''; };
+  document.getElementById('st_search').oninput = listStudents;
+
+  (async()=>{ await loadClassesForAccounts(); await listStudents(); })();
+</script>
+
+
+
 </body>
 </html>

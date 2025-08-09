@@ -29,6 +29,31 @@
 </header>
 
 <main class="container">
+   <!-- Update student data and read data -->
+<div class="card">
+  <h3>Students (All) — you can edit only your class</h3>
+  <input id="tst_search" placeholder="Search by name / Aadhaar / phone / admission no." style="margin-bottom:8px;width:100%" />
+  <table>
+    <thead>
+      <tr><th>Adm No.</th><th>Name</th><th>Class</th><th>Section</th><th>Father</th><th>Phones</th><th>Aadhaar</th><th>Action</th></tr>
+    </thead>
+    <tbody id="tst_rows"></tbody>
+  </table>
+</div>
+
+<div class="card" id="tst_edit" style="display:none">
+  <h3>Edit Student (Your Class Only)</h3>
+  <div class="grid">
+    <input id="tst_full_name" placeholder="Student Name*" />
+    <input id="tst_father_phone" placeholder="Father Phone*" />
+    <input id="tst_whatsapp" placeholder="WhatsApp*" />
+    <input id="tst_address" placeholder="Address*" />
+  </div>
+  <button id="tst_save">Save</button>
+  <p class="muted" id="tst_msg"></p>
+</div>
+
+
   <div class="grid">
     <!-- Post Homework -->
     <div class="card">
@@ -44,6 +69,8 @@
       <button id="hwSave">Save Homework</button>
       <p id="hwMsg" class="muted"></p>
     </div>
+
+
 
     <!-- Message a Parent -->
     <div class="card">
@@ -143,6 +170,66 @@
     await loadStudentsForMessages();
     await loadRecentHomework();
   })();
+  
+ 
+  let T_EDIT_ID = null;
+
+async function tListStudents(){
+  const q = document.getElementById('tst_search').value.trim();
+  let req = sb.from('students').select(
+    'id, admission_no, class_section, student_name, father_name, father_contact_no, whatsapp_no, aadhar_no, admitted_class_id'
+  ).order('student_name');
+  if (q) req = req.or(`student_name.ilike.%${q}%,aadhar_no.ilike.%${q}%,father_contact_no.ilike.%${q}%,whatsapp_no.ilike.%${q}%,admission_no.ilike.%${q}%`);
+  const { data: rows } = await req;
+  const { data: classes } = await sb.from('classes').select('id,name');
+  const cmap = Object.fromEntries((classes||[]).map(c=>[c.id,c.name]));
+  const tb = document.getElementById('tst_rows'); tb.innerHTML='';
+  (rows||[]).forEach(r=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r.admission_no||''}</td>
+      <td>${r.student_name}</td>
+      <td>${cmap[r.admitted_class_id]||''}</td>
+      <td>${r.class_section||''}</td>
+      <td>${r.father_name||''}</td>
+      <td>${r.father_contact_no||''}${r.whatsapp_no?(' / '+r.whatsapp_no):''}</td>
+      <td>${r.aadhar_no||''}</td>
+      <td><button class="tEdit" data-id="${r.id}">Edit</button></td>`;
+    tb.appendChild(tr);
+  });
+  document.querySelectorAll('.tEdit').forEach(b=>b.onclick=()=>tLoadEdit(b.dataset.id));
+}
+document.getElementById('tst_search').oninput = tListStudents;
+
+async function tLoadEdit(id){
+  const { data: r } = await sb.from('students').select(
+    'id, student_name, father_contact_no, whatsapp_no, address, admitted_class_id'
+  ).eq('id', id).single();
+  T_EDIT_ID = id;
+  document.getElementById('tst_full_name').value = r.student_name||'';
+  document.getElementById('tst_father_phone').value = r.father_contact_no||'';
+  document.getElementById('tst_whatsapp').value = r.whatsapp_no||'';
+  document.getElementById('tst_address').value = r.address||'';
+  document.getElementById('tst_edit').style.display = 'block';
+  document.getElementById('tst_msg').textContent = 'You can save only if this student belongs to your class.';
+}
+
+document.getElementById('tst_save').onclick = async ()=>{
+  const payload = {
+    student_name: document.getElementById('tst_full_name').value.trim(),
+    father_contact_no: document.getElementById('tst_father_phone').value.trim(),
+    whatsapp_no: document.getElementById('tst_whatsapp').value.trim(),
+    address: document.getElementById('tst_address').value.trim()
+  };
+  const { error } = await sb.from('students').update(payload).eq('id', T_EDIT_ID);
+  document.getElementById('tst_msg').textContent = error ? ('Error: '+error.message) : 'Saved.';
+  if (!error){ tListStudents(); }
+};
+
+(async()=>{ await tListStudents(); })();
+
+  
+  
 </script>
 </body>
 </html>

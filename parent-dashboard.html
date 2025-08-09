@@ -26,6 +26,17 @@
 </header>
 
 <main class="container">
+
+
+<div class="card">
+  <h3>My Child’s Details</h3>
+  <table>
+    <tbody id="p_child"></tbody>
+  </table>
+</div>
+
+
+
   <div class="card">
     <h3>Homework (Your Ward’s Class)</h3>
     <table>
@@ -128,6 +139,32 @@
     await loadInvoices();
     await loadMessages();
   })();
+  
+  async function loadMyChild(){
+  const { data: { user } } = await sb.auth.getUser();
+  if(!user) { location.href='index.html#login'; return; }
+  const { data: studs } = await sb.from('students').select(
+    'admission_no, class_section, student_name, admitted_class_id, father_name, mother_name, whatsapp_no, father_contact_no, aadhar_no, session'
+  ).eq('guardian_user_id', user.id).limit(1);
+  const row = studs?.[0];
+  const { data: classes } = await sb.from('classes').select('id,name');
+  const cmap = Object.fromEntries((classes||[]).map(c=>[c.id,c.name]));
+  const tb = document.getElementById('p_child'); tb.innerHTML='';
+  if(!row){ tb.innerHTML = '<tr><td>No student linked to this account yet.</td></tr>'; return; }
+  tb.innerHTML = `
+    <tr><th>Admission No.</th><td>${row.admission_no}</td></tr>
+    <tr><th>Name</th><td>${row.student_name}</td></tr>
+    <tr><th>Class</th><td>${cmap[row.admitted_class_id]||''} (${row.class_section||''})</td></tr>
+    <tr><th>Session</th><td>${row.session||''}</td></tr>
+    <tr><th>Father</th><td>${row.father_name||''} — ${row.father_contact_no||''}</td></tr>
+    <tr><th>Mother</th><td>${row.mother_name||''}</td></tr>
+    <tr><th>WhatsApp</th><td>${row.whatsapp_no||''}</td></tr>
+    <tr><th>Aadhaar</th><td>${row.aadhar_no||''}</td></tr>`;
+}
+(async()=>{ await loadMyChild(); })();
+
+
+
 </script>
 </body>
 </html>
