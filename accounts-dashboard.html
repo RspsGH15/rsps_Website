@@ -63,6 +63,13 @@
   <h3>Students — Add / Edit</h3>
   <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
     <input id="st_admission_no" placeholder="Admission Number*" />
+	
+	<select id="st_class">
+	<option value="">Class*</option><option>Nursery</option><option>LKG</option><option>UKG</option>
+	<option>1st</option><option>2nd</option><option>3rd</option><option>4th</option>
+	<option>5th</option><option>6th</option><option>7th</option><option>8th</option>
+	</select>
+	
     <input id="st_class_section" placeholder="Class Section* (e.g., A)" />
     <input id="st_full_name" placeholder="Student Name*" />
     <input id="st_session" placeholder="Session* (e.g., 2026-27)" />
@@ -74,7 +81,8 @@
     </select>
     <input id="st_aadhar" placeholder="Aadhaar (12 digits)*" />
     <input id="st_admission_date" type="date" placeholder="Admission Date*" />
-    <select id="st_class"></select>
+ /
+ 
     <input id="st_religion" placeholder="Religion*" />
     <input id="st_social" placeholder="Social Category* (GEN/SC/ST/OBC/EWS...)" />
     <input id="st_whatsapp" placeholder="WhatsApp No.*" />
