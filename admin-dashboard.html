@@ -36,6 +36,18 @@
   </header>
 
   <main class="container">
+  
+  
+  <div class="card">
+  <h3>Delete Requests (Students)</h3>
+  <table>
+    <thead><tr><th>When</th><th>Requested By</th><th>Reason</th><th>Actions</th></tr></thead>
+    <tbody id="delRows"></tbody>
+  </table>
+</div>
+
+  
+  
     <div class="card">
       <div class="row">
         <input id="filterFrom" placeholder="Filter by FROM name" />
@@ -64,7 +76,7 @@
       <table id="tbl">
         <thead>
           <tr>
-            <th class="nowrap">Time</</th>
+            <th class="nowrap">Time</th>
             <th>From</th>
             <th>To</th>
             <th>Student</th>
@@ -200,6 +212,53 @@
     document.getElementById('nextPage').addEventListener('click', ()=>{ state.page++; loadPage(); });
 
     loadPage();
+	
+	async function loadDeleteRequests(){
+  const { data: reqs } = await sb.from('delete_requests')
+    .select('id, table_name, row_id, reason, requested_by, status, created_at')
+    .eq('table_name','students')
+    .eq('status','pending')
+    .order('created_at',{ascending:false});
+  const { data: profs } = await sb.from('profiles').select('user_id, full_name, email');
+  const map = Object.fromEntries((profs||[]).map(p=>[p.user_id, (p.full_name||p.email||p.user_id)]));
+  const tb = document.getElementById('delRows'); tb.innerHTML='';
+  (reqs||[]).forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = `
+      <td>${new Date(r.created_at).toLocaleString()}</td>
+      <td>${map[r.requested_by]||r.requested_by}</td>
+      <td>${r.reason||''}</td>
+      <td>
+        <button class="approve" data-id="${r.id}" data-row="${r.row_id}">Approve & Delete</button>
+        <button class="reject"  data-id="${r.id}">Reject</button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+  document.querySelectorAll('.approve').forEach(b=>b.onclick=()=>approveDelete(b.dataset.id, b.dataset.row));
+  document.querySelectorAll('.reject').forEach(b=>b.onclick=()=>rejectDelete(b.dataset.id));
+}
+
+async function approveDelete(reqId, rowId){
+  // 1) delete student (admin is allowed by RLS)
+  const del = await sb.from('students').delete().eq('id', rowId);
+  if (del.error){ alert('Delete failed: '+del.error.message); return; }
+  // 2) mark request processed
+  const { data: me } = await sb.auth.getUser();
+  await sb.from('delete_requests').update({ status:'approved', processed_by: me.user.id, processed_at: new Date().toISOString() }).eq('id', reqId);
+  alert('Deleted.');
+  loadDeleteRequests();
+}
+
+async function rejectDelete(reqId){
+  const { data: me } = await sb.auth.getUser();
+  await sb.from('delete_requests').update({ status:'rejected', processed_by: me.user.id, processed_at: new Date().toISOString() }).eq('id', reqId);
+  loadDeleteRequests();
+}
+
+(async()=>{ await loadDeleteRequests(); })();
+
+
+
   </script>
 </body>
 </html>
