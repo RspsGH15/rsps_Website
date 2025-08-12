@@ -349,5 +349,39 @@
 
   (async()=>{ await ensureRole('accounts'); syncTransportUI(); syncSiblingUI(); await listStudents(); })();
 </script>
+
+<script>
+  async function ensureAccounts(){
+    const { data:{ user } } = await sb.auth.getUser();
+    if(!user){ location.href='index.html#login'; return null; }
+
+    const { data:p, error } = await sb.from('profiles')
+      .select('role, full_name')
+      .eq('user_id', user.id)
+      .single();
+
+    if (error) {
+      console.error('profiles read error', error);
+      alert('Cannot read your profile (RLS/policy).'); 
+      location.href='index.html#login'; 
+      return null;
+    }
+
+    const role = (p?.role || '').trim().toLowerCase();
+    if (role !== 'accounts') {
+      alert(`Access denied for ${role || 'unknown'} role`);
+      location.href='index.html#login';
+      return null;
+    }
+
+    const who = document.getElementById('who');
+    if (who) who.textContent = (p.full_name || 'Accounts');
+    return user;
+  }
+
+  document.addEventListener('DOMContentLoaded', ensureAccounts);
+</script>
+
+
 </body>
 </html>

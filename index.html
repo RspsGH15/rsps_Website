@@ -209,6 +209,12 @@
 <section id="login">
   <div class="container">
     <h2 class="section-title">User Login</h2>
+	  <p id="alreadySignedIn" class="small" hidden>
+        You’re already signed in. 
+        <a href="#" id="goDash">Open my dashboard</a> • 
+        <a href="#logout" id="logoutNow">Logout</a>
+      </p>
+
     <p class="small" style="margin-bottom:8px;">Choose your role to log in.</p>
 
     <div class="tabs" role="tablist" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
@@ -349,42 +355,30 @@
   </div>
 </footer>
 
-<!-- Supabase + Auth logic -->
+<!-- Supabase + Auth logic (clean single copy) -->
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
+  // 1) Init once
   const sb = supabase.createClient(
     "https://eqbbddsjutlupckqzlpq.supabase.co",
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmJkZHNqdXRsdXBja3F6bHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDkzOTMsImV4cCI6MjA3MDIyNTM5M30.CVmsiBCCp98ZQQOEe-1QgrvcJGeRP4DGHUx6j0wPCRI"
   );
 
-  function toggleMenu(){ document.getElementById('mobileMenu').classList.toggle('open'); }
-  document.getElementById('year').textContent = new Date().getFullYear();
-
-  // Enquiry → WhatsApp helper
-  function enquirySubmit(e){
-    e.preventDefault();
-    const n = document.getElementById('name').value.trim();
-    const p = document.getElementById('phone').value.trim();
-    const s = document.getElementById('student').value.trim();
-    const c = document.getElementById('class').value;
-    const m = document.getElementById('message').value.trim();
-    const text = encodeURIComponent(`Enquiry:\nParent: ${n}\nPhone: ${p}\nStudent: ${s}\nClass: ${c}\nMsg: ${m}`);
-    const wa = `https://wa.me/919999999999?text=${text}`;
-    document.getElementById('waLink').href = wa;
-    alert('Thanks! We will get back to you soon.');
-    return false;
+  // 2) Helpers
+  function recoveryRedirect(){
+    // Send password reset flow to /reset.html (must be allowed in Supabase Auth → Redirect URLs)
+    return `${location.origin}${location.pathname.replace(/[^/]*$/,'')}reset.html`;
   }
-
-  // Helpers and role redirects
   async function getMyProfile(userId){
     const { data, error } = await sb.from('profiles').select('full_name, role').eq('user_id', userId).single();
-    if (error) throw error; return data;
+    if (error) throw error;
+    return data;
   }
   function goRole(role){
-    if (role==='admin') location.href='admin-dashboard.html';
+    if (role==='admin')      location.href='admin-dashboard.html';
     else if (role==='accounts') location.href='accounts-dashboard.html';
-    else if (role==='teacher') location.href='teacher-dashboard.html';
-    else if (role==='parent') location.href='parent-dashboard.html';
+    else if (role==='teacher')  location.href='teacher-dashboard.html';
+    else if (role==='parent')   location.href='parent-dashboard.html';
     else alert('Unknown role: '+role);
   }
   function showErr(elId, err){
@@ -395,72 +389,42 @@
     setTimeout(()=>{ el.hidden=true; }, 6000);
   }
 
-  // Admin
-  const adminForm = document.querySelector("#adminTab form.login");
-  if (adminForm) adminForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = document.getElementById("aemail").value.trim();
-    const pass  = document.getElementById("apass").value;
-    try {
-      const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
-      if (error) throw error;
-      const user = data.user;
-      const p = await getMyProfile(user.id);
-      if (p.role !== "admin") throw new Error("This user is not an admin");
-      goRole(p.role);
-    } catch (err) { showErr("adminError", err); }
-  });
+  // 3) Role-based route after successful login
+  async function routeAfterLogin() {
+    const { data:{ user } } = await sb.auth.getUser();
+    if (!user) return;
+    const { data:p, error } = await sb.from('profiles').select('role').eq('user_id', user.id).single();
+    if (error) { console.error('profiles read error', error); alert('Cannot read your profile. Check RLS.'); return; }
+    if (!p) { alert('No profile/role found for this user.'); return; }
+    goRole(p.role);
+  }
 
-  // Accounts
-  const accountsForm = document.querySelector("#accountsTab form.login");
-  if (accountsForm) accountsForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = document.getElementById("acctUser").value.trim();
-    const pass  = document.getElementById("acctPass").value;
-    try {
-      const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
-      if (error) throw error;
-      const user = data.user;
-      const p = await getMyProfile(user.id);
-      if (p.role !== "accounts") throw new Error("This user is not accounts role");
-      goRole(p.role);
-    } catch (err) { showErr("accountsError", err); }
-  });
+  // 4) Bind each login form (email + password)
+  function bindPasswordLogin(formSel, emailId, passId, errorId, expectedRole){
+    const form = document.querySelector(formSel);
+    if (!form) return;
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const email = document.getElementById(emailId).value.trim();
+      const pass  = document.getElementById(passId).value;
+      try {
+        const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+        if (error) throw error;
+        const user = data.user;
+        const p = await getMyProfile(user.id);
+        if (p.role !== expectedRole) throw new Error(`This user is not ${expectedRole} role`);
+        goRole(p.role);
+      } catch (err) { showErr(errorId, err); }
+    });
+  }
 
-  // Teacher
-  const teacherForm = document.querySelector("#teacherTab form.login");
-  if (teacherForm) teacherForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = document.getElementById("tphone").value.trim();
-    const pass  = document.getElementById("tpass").value;
-    try {
-      const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
-      if (error) throw error;
-      const user = data.user;
-      const p = await getMyProfile(user.id);
-      if (p.role !== "teacher") throw new Error("This user is not teacher role");
-      goRole(p.role);
-    } catch (err) { showErr("teacherError", err); }
-  });
+  // Parent / Teacher / Accounts / Admin
+  bindPasswordLogin("#studentTab form.login",  "studentPhone", "studentOtp", "studentError",  "parent");
+  bindPasswordLogin("#teacherTab form.login",  "tphone",       "tpass",      "teacherError",  "teacher");
+  bindPasswordLogin("#accountsTab form.login", "acctUser",     "acctPass",   "accountsError", "accounts");
+  bindPasswordLogin("#adminTab form.login",    "aemail",       "apass",      "adminError",    "admin");
 
-  // Parent
-  const parentForm = document.querySelector("#studentTab form.login");
-  if (parentForm) parentForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = document.getElementById("studentPhone").value.trim();
-    const pass  = document.getElementById("studentOtp").value;
-    try {
-      const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
-      if (error) throw error;
-      const user = data.user;
-      const p = await getMyProfile(user.id);
-      if (p.role !== "parent") throw new Error("This user is not parent role");
-      goRole(p.role);
-    } catch (err) { showErr("studentError", err); }
-  });
-
-  // Forgot password → email reset link with redirect to reset.html
-  function recoveryRedirect(){ return `${location.origin}${location.pathname.replace(/[^/]*$/,'')}reset.html`; }
+  // 5) Forgot password → send email that redirects to /reset.html
   function bindForgot(linkId, getEmail){
     const a = document.getElementById(linkId);
     if(!a) return;
@@ -469,80 +433,45 @@
       const email = (getEmail()||'').trim();
       if(!email) return alert('Enter your email in the form first.');
       const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: recoveryRedirect() });
-      alert(error ? ('Error: '+error.message) : 'Password reset email sent. Please check your inbox.');
+      alert(error ? ('Error: '+error.message) : 'Password reset email sent. Please check your inbox/spam.');
     });
   }
-  bindForgot('adminForgot',   ()=>document.getElementById('aemail').value);
-  bindForgot('accountsForgot',()=>document.getElementById('acctUser').value);
-  bindForgot('teacherForgot', ()=>document.getElementById('tphone').value);
-  bindForgot('parentForgot',  ()=>document.getElementById('studentPhone').value);
-</script>
+  bindForgot('parentForgot',   ()=>document.getElementById('studentPhone').value);
+  bindForgot('teacherForgot',  ()=>document.getElementById('tphone').value);
+  bindForgot('accountsForgot', ()=>document.getElementById('acctUser').value);
+  bindForgot('adminForgot',    ()=>document.getElementById('aemail').value);
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-<script>
-  const sb = supabase.createClient(
-    "https://eqbbddsjutlupckqzlpq.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmJkZHNqdXRsdXBja3F6bHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDkzOTMsImV4cCI6MjA3MDIyNTM5M30.CVmsiBCCp98ZQQOEe-1QgrvcJGeRP4DGHUx6j0wPCRI"
-  );
-
-  async function routeAfterLogin() {
-    const { data:{ user } } = await sb.auth.getUser();
-    if (!user) return;
-    const { data:p } = await sb.from('profiles').select('role').eq('user_id', user.id).single();
-    if (!p) { alert('No profile/role found for this user. Ask admin to create one in profiles.'); return; }
-    const role = p.role;
-    if (role === 'admin') location.href = 'admin-dashboard.html';
-    else if (role === 'accounts') location.href = 'accounts-dashboard.html';
-    else if (role === 'teacher') location.href = 'teacher-dashboard.html';
-    else if (role === 'parent') location.href = 'parent-dashboard.html';
-    else alert('Unknown role in profiles: '+role);
+  // 6) Session helpers: no auto-redirect on homepage
+(async ()=>{
+  // Support #logout to quickly sign out
+  if (location.hash === '#logout') {
+    await sb.auth.signOut().catch(()=>{});
+    // Go back to home cleanly (removes the hash to avoid loops)
+    location.replace(location.pathname + '#home');
+    return;
   }
 
-  // Attach to each login form (email+password)
-  const bindLogin = (emailId, passId, errorId) => {
-    const email = document.getElementById(emailId);
-    const pass  = document.getElementById(passId);
-    const err   = document.getElementById(errorId);
-    if (!email || !pass) return;
-    email.form.onsubmit = async (e)=>{
-      e.preventDefault();
-      err.hidden = true;
-      const { error } = await sb.auth.signInWithPassword({ email: email.value.trim(), password: pass.value });
-      if (error) { err.hidden=false; err.textContent = error.message; }
-      else { routeAfterLogin(); }
-    };
-  };
-  bindLogin('studentPhone','studentOtp','studentError');   // parent
-  bindLogin('tphone','tpass','teacherError');              // teacher
-  bindLogin('acctUser','acctPass','accountsError');        // accounts
-  bindLogin('aemail','apass','adminError');                // admin
+  const { data:{ session } } = await sb.auth.getSession();
 
-  // Forgot password -> send reset to reset.html
-  const sendReset = (btnId, getEmailId) => {
-    const btn = document.getElementById(btnId);
-    if (!btn) return;
-    btn.onclick = async (e)=>{
-      e.preventDefault();
-      const email = document.getElementById(getEmailId).value.trim();
-      if(!email) return alert('Enter your email in the box first.');
-      const { error } = await sb.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin.replace(/\/+$/,'') + '/reset.html'
-      });
-      if (error) alert(error.message);
-      else alert('Reset link sent. Please check your inbox/spam.');
-    };
-  };
-  sendReset('parentForgot','studentPhone');
-  sendReset('teacherForgot','tphone');
-  sendReset('accountsForgot','acctUser');
-  sendReset('adminForgot','aemail');
+  // If signed in and user is on the login tab, DON'T auto-redirect.
+  // Show a small banner with "Open my dashboard" + "Logout".
+  if (session) {
+    const banner = document.getElementById('alreadySignedIn');
+    const goDash = document.getElementById('goDash');
+    const logoutNow = document.getElementById('logoutNow');
 
-  // If already logged in, auto-route (nice for returning users)
-  sb.auth.getSession().then(({ data:{ session } })=>{
-    if(session) routeAfterLogin();
-  });
+    if (banner && goDash && logoutNow) {
+      banner.hidden = false;
+      goDash.onclick = (e)=>{ e.preventDefault(); routeAfterLogin(); };
+      logoutNow.onclick = async (e)=>{
+        e.preventDefault();
+        await sb.auth.signOut().catch(()=>{});
+        location.reload();
+      };
+    }
+  }
+})();
+
 </script>
-
-
 </body>
 </html>
