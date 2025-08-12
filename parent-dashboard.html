@@ -1,170 +1,88 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>RSPS — Parent</title>
-<style>
-  body{font-family:system-ui;margin:0;background:#f8fafc;color:#111827}
-  header{background:#0b6ef3;color:#fff;padding:12px 16px}
-  .container{max-width:1100px;margin:0 auto;padding:16px}
-  .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:14px}
-  table{width:100%;border-collapse:collapse}
-  th,td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:left;font-size:14px;vertical-align:top}
-  th{background:#f1f5f9}
-  .muted{color:#64748b;font-size:13px}
-  button{padding:8px 10px;border-radius:10px;border:1px solid #d1d5db;background:#0b6ef3;color:#fff;cursor:pointer}
-</style>
+  <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>RSPS • Parent Dashboard</title>
+  <!-- RSPS BUILD v5 -->
+  <style>
+    :root{ --brand:#0b6ef3; --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --bg:#f8fafc; --card:#fff; --ok:#16a34a; --err:#ef4444; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto;color:var(--ink);background:var(--bg)}
+    header{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:10px 16px;font-weight:800;display:flex;justify-content:space-between;align-items:center}
+    main.container{max-width:1100px;margin:0 auto;padding:16px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+    h2{margin:0 0 10px} h3{margin:0 0 8px}
+    .grid{display:grid;gap:10px}
+    .muted{color:var(--muted);font-size:13px}
+  </style>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    const sb = supabase.createClient(
+      "https://eqbbddsjutlupckqzlpq.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmJkZHNqdXRsdXBja3F6bHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDkzOTMsImV4cCI6MjA3MDIyNTM5M30.CVmsiBCCp98ZQQOEe-1QgrvcJGeRP4DGHUx6j0wPCRI"
+    );
+    async function ensureRole(role){
+      const { data:{user} } = await sb.auth.getUser();
+      if(!user){ location.href='index.html#login'; return; }
+      const { data:p } = await sb.from('profiles').select('role,full_name,email').eq('user_id',user.id).single();
+      if(!p || p.role!==role){ alert('Access denied for '+role); location.href='index.html#login'; return; }
+      const who = document.getElementById('who'); if(who) who.textContent=(p.full_name?p.full_name+' ('+p.role+')':(p.email+' ('+p.role+')'));
+    }
+    const el = (id)=>document.getElementById(id);
+  </script>
 </head>
 <body>
-<header>
-  <div class="container">
-    <strong>Parent Dashboard</strong>
-    <span id="who" class="muted"></span>
-    <button id="logout" style="float:right">Logout</button>
-  </div>
-</header>
+<header>Parent Dashboard <span class="muted" id="who"></span> <a class="btn-outline" href="index.html#login">Logout</a></header>
 
 <main class="container">
-
-
-<div class="card">
-  <h3>My Child’s Details</h3>
-  <table>
-    <tbody id="p_child"></tbody>
-  </table>
-</div>
-
-
-
   <div class="card">
-    <h3>Homework (Your Ward’s Class)</h3>
-    <table>
-      <thead><tr><th>Subject</th><th>Due</th><th>Content</th></tr></thead>
-      <tbody id="hw"></tbody>
-    </table>
+    <h3>My Child’s Details</h3>
+    <table><tbody id="p_child"></tbody></table>
   </div>
 
   <div class="card">
-    <h3>Fees (Invoices)</h3>
-    <table>
-      <thead><tr><th>Month</th><th>Tuition</th><th>Transport</th><th>Other</th><th>Discount</th><th>Status</th></tr></thead>
-      <tbody id="fees"></tbody>
-    </table>
-    <p class="muted">Payments page coming soon. For now, please pay via QR/UPI and share receipt to school WhatsApp.</p>
-  </div>
-
-  <div class="card">
-    <h3>Messages</h3>
-    <table>
-      <thead><tr><th>From</th><th>Subject</th><th>Message</th><th>Time</th></tr></thead>
-      <tbody id="msgs"></tbody>
-    </table>
+    <h3>Class Updates — Syllabus / Exam / Date Sheet / Progress</h3>
+    <div id="p_updates" class="grid"></div>
   </div>
 </main>
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
-  const sb = supabase.createClient(
-    "https://eqbbddsjutlupckqzlpq.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmJkZHNqdXRsdXBja3F6bHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDkzOTMsImV4cCI6MjA3MDIyNTM5M30.CVmsiBCCp98ZQQOEe-1QgrvcJGeRP4DGHUx6j0wPCRI"
-  );
-
-  let me = null, myStudentId = null, myClassId = null;
-
-  async function ensureRole(roleNeeded){
-    const { data: { user } } = await sb.auth.getUser();
-    if(!user){ location.href='index.html#login'; return; }
-    const { data: p, error } = await sb.from('profiles').select('full_name, role').eq('user_id', user.id).single();
-    if(error || !p || p.role !== roleNeeded){ alert('Access denied'); location.href='index.html'; return; }
-    document.getElementById('who').textContent = ` | ${p.full_name} (${p.role})`;
-    me = user;
-  }
-
-  document.getElementById('logout').onclick = async ()=>{ await sb.auth.signOut(); location.href='index.html#login'; };
-
-  async function findWard(){
-    // Parent can only see their own ward due to RLS
-    const { data: studs } = await sb.from('students').select('id, full_name, class_id').eq('guardian_user_id', me.id).limit(1);
-    if(!studs || !studs.length){ return null; }
-    myStudentId = studs[0].id; myClassId = studs[0].class_id;
-    return studs[0];
-  }
-
-  async function loadHomework(){
-    if(!myClassId) return;
-    const { data: list } = await sb.from('homework').select('subject, content, due_date').eq('class_id', myClassId).order('created_at',{ascending:false}).limit(30);
-    const tbody = document.getElementById('hw'); tbody.innerHTML='';
-    (list||[]).forEach(h=>{
-      const tr=document.createElement('tr');
-      tr.innerHTML = `<td>${h.subject||''}</td><td>${h.due_date||''}</td><td>${h.content||''}</td>`;
-      tbody.appendChild(tr);
-    });
-  }
-
-  async function loadInvoices(){
-    if(!myStudentId) return;
-    const { data: invs } = await sb.from('invoices')
-      .select('period_month, tuition_amount, transport_amount, other_amount, discount_tuition_pct, discount_admission, discount_annual, status')
-      .eq('student_id', myStudentId)
-      .order('period_month',{ascending:false})
-      .limit(24);
-    const tbody = document.getElementById('fees'); tbody.innerHTML='';
-    (invs||[]).forEach(i=>{
-      const month = i.period_month?.slice(0,7) || '';
-      const disc = `${i.discount_tuition_pct||0}% + ₹${(i.discount_admission||0)+(i.discount_annual||0)}`;
-      const tr=document.createElement('tr');
-      tr.innerHTML = `<td>${month}</td><td>₹${i.tuition_amount||0}</td><td>₹${i.transport_amount||0}</td><td>₹${i.other_amount||0}</td><td>${disc}</td><td>${i.status}</td>`;
-      tbody.appendChild(tr);
-    });
-  }
-
-  async function loadMessages(){
-    const { data: msgs } = await sb.from('messages').select('from_user, subject, body, created_at').order('created_at',{ascending:false}).limit(30);
-    // Map teacher names
-    const { data: profs } = await sb.from('profiles').select('user_id, full_name');
-    const map = Object.fromEntries((profs||[]).map(p=>[p.user_id,p.full_name]));
-    const tbody = document.getElementById('msgs'); tbody.innerHTML='';
-    (msgs||[]).forEach(m=>{
-      const tr=document.createElement('tr');
-      tr.innerHTML = `<td>${map[m.from_user]||'Teacher'}</td><td>${m.subject||''}</td><td>${m.body||''}</td><td>${new Date(m.created_at).toLocaleString()}</td>`;
-      tbody.appendChild(tr);
-    });
-  }
-
-  (async()=>{
-    await ensureRole('parent');
-    const ward = await findWard();
-    await loadHomework();
-    await loadInvoices();
-    await loadMessages();
-  })();
-  
-  async function loadMyChild(){
-  const { data: { user } } = await sb.auth.getUser();
-  if(!user) { location.href='index.html#login'; return; }
-  const { data: studs } = await sb.from('students').select(
-    'admission_no, class_section, student_name, admitted_class_id, father_name, mother_name, whatsapp_no, father_contact_no, aadhar_no, session'
-  ).eq('guardian_user_id', user.id).limit(1);
+async function loadMyChild(){
+  const { data:{ user } } = await sb.auth.getUser();
+  if(!user) return location.href='index.html#login';
+  const { data: studs } = await sb.from('students')
+    .select('id, admission_no, class_section, student_name, admitted_class_id, father_name, mother_name, whatsapp_no, father_contact_no, aadhar_no, session')
+    .eq('guardian_user_id', user.id)
+    .limit(1);
   const row = studs?.[0];
-  const { data: classes } = await sb.from('classes').select('id,name');
-  const cmap = Object.fromEntries((classes||[]).map(c=>[c.id,c.name]));
-  const tb = document.getElementById('p_child'); tb.innerHTML='';
-  if(!row){ tb.innerHTML = '<tr><td>No student linked to this account yet.</td></tr>'; return; }
-  tb.innerHTML = `
-    <tr><th>Admission No.</th><td>${row.admission_no}</td></tr>
-    <tr><th>Name</th><td>${row.student_name}</td></tr>
-    <tr><th>Class</th><td>${cmap[row.admitted_class_id]||''} (${row.class_section||''})</td></tr>
-    <tr><th>Session</th><td>${row.session||''}</td></tr>
-    <tr><th>Father</th><td>${row.father_name||''} — ${row.father_contact_no||''}</td></tr>
-    <tr><th>Mother</th><td>${row.mother_name||''}</td></tr>
-    <tr><th>WhatsApp</th><td>${row.whatsapp_no||''}</td></tr>
-    <tr><th>Aadhaar</th><td>${row.aadhar_no||''}</td></tr>`;
+  const tb = el('p_child'); tb.innerHTML='';
+  if(!row){ tb.innerHTML='<tr><td>No student linked to this account yet.</td></tr>'; }
+  else {
+    tb.innerHTML = `
+      <tr><th>Admission No.</th><td>${row.admission_no}</td></tr>
+      <tr><th>Name</th><td>${row.student_name}</td></tr>
+      <tr><th>Class</th><td>${row.admitted_class_id} (${row.class_section||''})</td></tr>
+      <tr><th>Session</th><td>${row.session||''}</td></tr>
+      <tr><th>Father</th><td>${row.father_name||''} — ${row.father_contact_no||''}</td></tr>
+      <tr><th>Mother</th><td>${row.mother_name||''}</td></tr>
+      <tr><th>WhatsApp</th><td>${row.whatsapp_no||''}</td></tr>
+      <tr><th>Aadhaar</th><td>${row.aadhar_no||''}</td></tr>`;
+  }
+
+  const up = document.getElementById('p_updates'); up.innerHTML='';
+  const sy = await sb.from('syllabi').select('id, content, created_at').order('created_at',{ascending:false}).limit(3);
+  const ex = await sb.from('exam_dates').select('id, title, exam_date, created_at').order('created_at',{ascending:false}).limit(3);
+  const ds = await sb.from('date_sheets').select('id, link, created_at').order('created_at',{ascending:false}).limit(3);
+  const pr = await sb.from('progress_reports').select('id, image_path, created_at').order('created_at',{ascending:false}).limit(6);
+
+  const card = (html)=>{ const c=document.createElement('div'); c.className='card'; c.innerHTML=html; return c; };
+  (sy.data||[]).forEach(s=> up.appendChild(card(`<h4>Syllabus</h4><p class="muted">${new Date(s.created_at).toLocaleString()}</p><div>${s.content}</div>`)));
+  (ex.data||[]).forEach(e=> up.appendChild(card(`<h4>Exam</h4><p class="muted">${new Date(e.created_at).toLocaleString()}</p><div><strong>${e.title}</strong> — ${e.exam_date}</div>`)));
+  (ds.data||[]).forEach(d=> up.appendChild(card(`<h4>Date Sheet</h4><p class="muted">${new Date(d.created_at).toLocaleString()}</p><a href="${d.link}" target="_blank" rel="noopener">Open</a>`)));
+  (pr.data||[]).forEach(p=> up.appendChild(card(`<h4>Daily Progress</h4><p class="muted">${new Date(p.created_at).toLocaleString()}</p><img src="${'https://eqbbddsjutlupckqzlpq.supabase.co/storage/v1/object/public/progress-reports/'}${p.image_path}" style="max-width:100%;border:1px solid #e5e7eb;border-radius:10px"/>`)));
 }
-(async()=>{ await loadMyChild(); })();
 
-
-
+(async()=>{ await ensureRole('parent'); await loadMyChild(); })();
 </script>
 </body>
 </html>

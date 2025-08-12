@@ -1,235 +1,164 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>RSPS — Teacher</title>
-<style>
-  body{font-family:system-ui;margin:0;background:#f8fafc;color:#111827}
-  header{background:#0b6ef3;color:#fff;padding:12px 16px}
-  .container{max-width:1100px;margin:0 auto;padding:16px}
-  .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:14px}
-  input,textarea,button,select{padding:10px;border-radius:10px;border:1px solid #d1d5db;font-size:14px;width:100%}
-  button{background:#0b6ef3;color:#fff;border:0;cursor:pointer;width:auto}
-  .grid{display:grid;gap:12px;grid-template-columns:1fr 1fr}
-  @media(max-width:860px){.grid{grid-template-columns:1fr}}
-  .muted{color:#64748b;font-size:13px}
-  table{width:100%;border-collapse:collapse}
-  th,td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:left;font-size:14px;vertical-align:top}
-  th{background:#f1f5f9}
-</style>
+  <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>RSPS • Teacher Dashboard</title>
+  <!-- RSPS BUILD v5 -->
+  <style>
+    :root{ --brand:#0b6ef3; --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --bg:#f8fafc; --card:#fff; --ok:#16a34a; --err:#ef4444; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto;color:var(--ink);background:var(--bg)}
+    header{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:10px 16px;font-weight:800;display:flex;justify-content:space-between;align-items:center}
+    main.container{max-width:1100px;margin:0 auto;padding:16px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+    h2{margin:0 0 10px} h3{margin:0 0 8px} h4{margin:0 0 6px}
+    .btn{background:var(--brand);color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+    .btn-outline{background:#fff;color:var(--brand);border:1px solid var(--brand);border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-top:1px solid var(--line);padding:8px;text-align:left;font-size:14px;vertical-align:top}
+    input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:10px;font-size:14px}
+    .grid{display:grid;gap:10px}
+    .form-rows{display:grid;grid-template-columns:1fr 2fr;gap:10px;align-items:center}
+    @media (max-width:760px){.form-rows{grid-template-columns:1fr}}
+    .form-rows label{font-weight:600;font-size:14px}
+    .muted{color:var(--muted);font-size:13px}
+    .ok{color:var(--ok)} .err{color:var(--err)}
+  </style>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    const sb = supabase.createClient(
+      "https://eqbbddsjutlupckqzlpq.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmJkZHNqdXRsdXBja3F6bHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDkzOTMsImV4cCI6MjA3MDIyNTM5M30.CVmsiBCCp98ZQQOEe-1QgrvcJGeRP4DGHUx6j0wPCRI"
+    );
+    async function ensureRole(role){
+      const { data:{user} } = await sb.auth.getUser();
+      if(!user){ location.href='index.html#login'; return; }
+      const { data:p } = await sb.from('profiles').select('role,full_name,email').eq('user_id',user.id).single();
+      if(!p || p.role!==role){ alert('Access denied for '+role); location.href='index.html#login'; return; }
+      const who = document.getElementById('who'); if(who) who.textContent=(p.full_name?p.full_name+' ('+p.role+')':(p.email+' ('+p.role+')'));
+    }
+    const el = (id)=>document.getElementById(id);
+    const isTen = (s)=>/^\d{10}$/.test(s||'');
+    const hasNoDigits = (s)=>!/\d/.test(s||'');
+  </script>
 </head>
 <body>
-<header>
-  <div class="container">
-    <strong>Teacher Dashboard</strong>
-    <span id="who" class="muted"></span>
-    <button id="logout" style="float:right">Logout</button>
-  </div>
-</header>
+<header>Teacher Dashboard <span class="muted" id="who"></span> <a class="btn-outline" href="index.html#login">Logout</a></header>
 
 <main class="container">
-   <!-- Update student data and read data -->
-<div class="card">
-  <h3>Students (All) — you can edit only your class</h3>
-  <input id="tst_search" placeholder="Search by name / Aadhaar / phone / admission no." style="margin-bottom:8px;width:100%" />
-  <table>
-    <thead>
-      <tr><th>Adm No.</th><th>Name</th><th>Class</th><th>Section</th><th>Father</th><th>Phones</th><th>Aadhaar</th><th>Action</th></tr>
-    </thead>
-    <tbody id="tst_rows"></tbody>
-  </table>
-</div>
-
-<div class="card" id="tst_edit" style="display:none">
-  <h3>Edit Student (Your Class Only)</h3>
-  <div class="grid">
-    <input id="tst_full_name" placeholder="Student Name*" />
-    <input id="tst_father_phone" placeholder="Father Phone*" />
-    <input id="tst_whatsapp" placeholder="WhatsApp*" />
-    <input id="tst_address" placeholder="Address*" />
+  <div class="card">
+    <h3>Students (All) — you can edit only your class</h3>
+    <input id="tst_search" placeholder="Search by name / Aadhaar / phone / admission no." style="margin-bottom:8px;width:100%"/>
+    <table>
+      <thead><tr><th>Adm No.</th><th>Name</th><th>Class</th><th>Section</th><th>Father</th><th>Phones</th><th>Aadhaar</th><th>Action</th></tr></thead>
+      <tbody id="tst_rows"></tbody>
+    </table>
   </div>
-  <button id="tst_save">Save</button>
-  <p class="muted" id="tst_msg"></p>
-</div>
 
-
-  <div class="grid">
-    <!-- Post Homework -->
-    <div class="card">
-      <h3>Post Homework</h3>
-      <label>Class</label>
-      <select id="hwClass"></select>
-      <label>Subject</label>
-      <input id="hwSubject" placeholder="e.g., Mathematics" />
-      <label>Content</label>
-      <textarea id="hwContent" placeholder="Homework details"></textarea>
-      <label>Due date</label>
-      <input id="hwDue" type="date" />
-      <button id="hwSave">Save Homework</button>
-      <p id="hwMsg" class="muted"></p>
+  <div class="card" id="tst_edit" style="display:none">
+    <h3>Edit Student (Your Class Only)</h3>
+    <div class="form-rows">
+      <label>Student Name*</label><input id="tst_full_name" inputmode="text"/>
+      <label>Father Phone*</label><input id="tst_father_phone" placeholder="10-digit mobile" inputmode="numeric"/>
+      <label>WhatsApp*</label><input id="tst_whatsapp" placeholder="10-digit mobile" inputmode="numeric"/>
+      <label>Address*</label><input id="tst_address" placeholder="House, Village, Post, Tehsil, District"/>
     </div>
-
-
-
-    <!-- Message a Parent -->
-    <div class="card">
-      <h3>Message a Parent</h3>
-      <label>Student (from your classes)</label>
-      <select id="msgStudent"></select>
-      <label>Subject</label>
-      <input id="msgSubject" placeholder="Subject" />
-      <label>Message</label>
-      <textarea id="msgBody" placeholder="Write your message"></textarea>
-      <button id="msgSend">Send Message</button>
-      <p id="msgOut" class="muted"></p>
-    </div>
+    <button class="btn" id="tst_save">Save</button>
+    <p class="muted" id="tst_msg"></p>
   </div>
 
   <div class="card">
-    <h3>Recent Homework</h3>
-    <table>
-      <thead><tr><th>Class</th><th>Subject</th><th>Due</th><th>Content</th></tr></thead>
-      <tbody id="hwList"></tbody>
-    </table>
+    <h3>Class Docs — Syllabus / Date Sheet / Progress Image</h3>
+    <div class="form-rows">
+      <label>Syllabus to cover (session)</label><textarea id="syllabus_text" placeholder="Units/chapters..."></textarea>
+      <label>Tentative exam (title)</label><input id="exam_title" placeholder="Unit Test 1"/>
+      <label>Exam date</label><input id="exam_date" type="date"/>
+      <label>Date sheet (PDF/Link)</label><input id="date_sheet_url" placeholder="https://..."/>
+      <label>Daily progress image</label><input id="progress_img" type="file" accept="image/*"/>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="save_docs">Post/Upload</button>
+      <span id="docs_msg" class="muted"></span>
+    </div>
   </div>
 </main>
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
-  const sb = supabase.createClient(
-    "https://eqbbddsjutlupckqzlpq.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmJkZHNqdXRsdXBja3F6bHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDkzOTMsImV4cCI6MjA3MDIyNTM5M30.CVmsiBCCp98ZQQOEe-1QgrvcJGeRP4DGHUx6j0wPCRI"
-  );
-
-  let me = null;
-
-  async function ensureRole(roleNeeded){
-    const { data: { user } } = await sb.auth.getUser();
-    if(!user){ location.href='index.html#login'; return; }
-    const { data: p, error } = await sb.from('profiles').select('full_name, role').eq('user_id', user.id).single();
-    if(error || !p || p.role !== roleNeeded){ alert('Access denied'); location.href='index.html'; return; }
-    document.getElementById('who').textContent = ` | ${p.full_name} (${p.role})`;
-    me = user;
-  }
-
-  document.getElementById('logout').onclick = async ()=>{ await sb.auth.signOut(); location.href='index.html#login'; };
-
-  // Load teacher classes + recent homework
-  async function loadClasses(){
-    const { data: classes } = await sb.from('classes').select('id,name').order('name');
-    const sel = document.getElementById('hwClass');
-    (classes||[]).forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o); });
-  }
-  async function loadStudentsForMessages(){
-    // teachers can read students; class teacher can update class students
-    const { data: studs } = await sb.from('students').select('id, full_name').order('full_name');
-    const sel = document.getElementById('msgStudent');
-    (studs||[]).forEach(s=>{ const o=document.createElement('option'); o.value=s.id; o.textContent=s.full_name; sel.appendChild(o); });
-  }
-  async function loadRecentHomework(){
-    const { data: list } = await sb.from('homework').select('class_id, subject, content, due_date').order('created_at',{ascending:false}).limit(20);
-    const { data: classes } = await sb.from('classes').select('id,name');
-    const map = Object.fromEntries((classes||[]).map(c=>[c.id,c.name]));
-    const tbody = document.getElementById('hwList'); tbody.innerHTML='';
-    (list||[]).forEach(h=>{
-      const tr=document.createElement('tr');
-      tr.innerHTML = `<td>${map[h.class_id]||''}</td><td>${h.subject||''}</td><td>${h.due_date||''}</td><td>${h.content||''}</td>`;
-      tbody.appendChild(tr);
-    });
-  }
-
-  // Save homework
-  document.getElementById('hwSave').onclick = async ()=>{
-    const class_id = document.getElementById('hwClass').value;
-    const subject  = document.getElementById('hwSubject').value.trim();
-    const content  = document.getElementById('hwContent').value.trim();
-    const due_date = document.getElementById('hwDue').value;
-    if(!class_id || !subject || !content){ document.getElementById('hwMsg').textContent='Fill all fields.'; return; }
-    const { error } = await sb.from('homework').insert({ class_id, subject, content, due_date, created_by: me.id });
-    document.getElementById('hwMsg').textContent = error ? ('Error: '+error.message) : 'Saved!';
-    if(!error) loadRecentHomework();
-  };
-
-  // Send message
-  document.getElementById('msgSend').onclick = async ()=>{
-    const student_id = document.getElementById('msgStudent').value;
-    const subject = document.getElementById('msgSubject').value.trim();
-    const body    = document.getElementById('msgBody').value.trim();
-    if(!student_id || !subject || !body){ document.getElementById('msgOut').textContent='Fill all fields.'; return; }
-    // Look up student guardian user id
-    const { data: s } = await sb.from('students').select('guardian_user_id').eq('id', student_id).single();
-    const to_guardian_user = s?.guardian_user_id || null;
-    const { error } = await sb.from('messages').insert({ from_user: me.id, to_guardian_user, student_id, subject, body });
-    document.getElementById('msgOut').textContent = error ? ('Error: '+error.message) : 'Message sent!';
-  };
-
-  (async()=>{
-    await ensureRole('teacher');
-    await loadClasses();
-    await loadStudentsForMessages();
-    await loadRecentHomework();
-  })();
-  
- 
-  let T_EDIT_ID = null;
+let T_EDIT_ID=null;
 
 async function tListStudents(){
-  const q = document.getElementById('tst_search').value.trim();
-  let req = sb.from('students').select(
-    'id, admission_no, class_section, student_name, father_name, father_contact_no, whatsapp_no, aadhar_no, admitted_class_id'
-  ).order('student_name');
-  if (q) req = req.or(`student_name.ilike.%${q}%,aadhar_no.ilike.%${q}%,father_contact_no.ilike.%${q}%,whatsapp_no.ilike.%${q}%,admission_no.ilike.%${q}%`);
+  const q = el('tst_search').value.trim();
+  let req = sb.from('students').select('id, admission_no, class_section, student_name, father_name, father_contact_no, whatsapp_no, aadhar_no, admitted_class_id').order('student_name');
+  if(q) req = req.or(`student_name.ilike.%${q}%,aadhar_no.ilike.%${q}%,father_contact_no.ilike.%${q}%,whatsapp_no.ilike.%${q}%,admission_no.ilike.%${q}%`);
   const { data: rows } = await req;
-  const { data: classes } = await sb.from('classes').select('id,name');
-  const cmap = Object.fromEntries((classes||[]).map(c=>[c.id,c.name]));
-  const tb = document.getElementById('tst_rows'); tb.innerHTML='';
+  const tb=document.getElementById('tst_rows'); tb.innerHTML='';
   (rows||[]).forEach(r=>{
-    const tr = document.createElement('tr');
+    const tr=document.createElement('tr');
     tr.innerHTML = `
       <td>${r.admission_no||''}</td>
-      <td>${r.student_name}</td>
-      <td>${cmap[r.admitted_class_id]||''}</td>
+      <td>${r.student_name||''}</td>
+      <td>${r.admitted_class_id||''}</td>
       <td>${r.class_section||''}</td>
       <td>${r.father_name||''}</td>
       <td>${r.father_contact_no||''}${r.whatsapp_no?(' / '+r.whatsapp_no):''}</td>
       <td>${r.aadhar_no||''}</td>
-      <td><button class="tEdit" data-id="${r.id}">Edit</button></td>`;
+      <td><button class="btn tEdit" data-id="${r.id}">Edit</button></td>`;
     tb.appendChild(tr);
   });
   document.querySelectorAll('.tEdit').forEach(b=>b.onclick=()=>tLoadEdit(b.dataset.id));
 }
-document.getElementById('tst_search').oninput = tListStudents;
 
 async function tLoadEdit(id){
-  const { data: r } = await sb.from('students').select(
-    'id, student_name, father_contact_no, whatsapp_no, address, admitted_class_id'
-  ).eq('id', id).single();
-  T_EDIT_ID = id;
-  document.getElementById('tst_full_name').value = r.student_name||'';
-  document.getElementById('tst_father_phone').value = r.father_contact_no||'';
-  document.getElementById('tst_whatsapp').value = r.whatsapp_no||'';
-  document.getElementById('tst_address').value = r.address||'';
-  document.getElementById('tst_edit').style.display = 'block';
-  document.getElementById('tst_msg').textContent = 'You can save only if this student belongs to your class.';
+  const { data:r } = await sb.from('students').select('id, student_name, father_contact_no, whatsapp_no, address').eq('id', id).single();
+  T_EDIT_ID=id;
+  el('tst_full_name').value = r.student_name||'';
+  el('tst_father_phone').value = r.father_contact_no||'';
+  el('tst_whatsapp').value = r.whatsapp_no||'';
+  el('tst_address').value = r.address||'';
+  el('tst_edit').style.display='block';
+  el('tst_msg').textContent='You can save only if this student belongs to your class.';
 }
 
 document.getElementById('tst_save').onclick = async ()=>{
-  const payload = {
-    student_name: document.getElementById('tst_full_name').value.trim(),
-    father_contact_no: document.getElementById('tst_father_phone').value.trim(),
-    whatsapp_no: document.getElementById('tst_whatsapp').value.trim(),
-    address: document.getElementById('tst_address').value.trim()
-  };
+  const nm = el('tst_full_name').value.trim();
+  const fp = el('tst_father_phone').value.trim();
+  const wa = el('tst_whatsapp').value.trim();
+  const ad = el('tst_address').value.trim();
+  if(!nm || !hasNoDigits(nm)) return el('tst_msg').textContent='Invalid student name (no numbers).';
+  if(!isTen(fp)) return el('tst_msg').textContent='Father phone must be 10 digits.';
+  if(!isTen(wa)) return el('tst_msg').textContent='WhatsApp must be 10 digits.';
+  if(!ad) return el('tst_msg').textContent='Address is required.';
+  const payload = { student_name:nm, father_contact_no:fp, whatsapp_no:wa, address:ad };
   const { error } = await sb.from('students').update(payload).eq('id', T_EDIT_ID);
-  document.getElementById('tst_msg').textContent = error ? ('Error: '+error.message) : 'Saved.';
-  if (!error){ tListStudents(); }
+  el('tst_msg').textContent = error ? ('Error: '+error.message) : 'Saved.';
+  if(!error){ tListStudents(); }
 };
 
-(async()=>{ await tListStudents(); })();
+// docs (assumes tables + policies exist)
+document.getElementById('save_docs').onclick = async ()=>{
+  const text = el('syllabus_text').value.trim();
+  const title = el('exam_title').value.trim();
+  const edate = el('exam_date').value;
+  const durl  = el('date_sheet_url').value.trim();
+  const img   = el('progress_img').files[0];
+  const msg = el('docs_msg'); msg.textContent='';
+  try {
+    if (text)  await sb.from('syllabi').insert({ content:text });
+    if (title && edate) await sb.from('exam_dates').insert({ title, exam_date:edate });
+    if (durl) await sb.from('date_sheets').insert({ link:durl });
+    if (img) {
+      const key = `progress-${Date.now()}-${img.name}`;
+      const up  = await sb.storage.from('progress-reports').upload(key, img, { cacheControl: '3600', upsert: false });
+      if (up.error) throw up.error;
+      await sb.from('progress_reports').insert({ image_path:key });
+    }
+    msg.textContent='Uploaded/Posted.'; msg.className='ok';
+  } catch(err) {
+    msg.textContent='Error: '+(err.message||err); msg.className='err';
+  }
+};
 
-  
-  
+(async()=>{ await ensureRole('teacher'); await tListStudents(); })();
 </script>
 </body>
 </html>

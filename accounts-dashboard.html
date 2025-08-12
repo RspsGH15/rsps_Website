@@ -1,334 +1,356 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>RSPS — Accounts</title>
-<style>
-  body{font-family:system-ui;margin:0;background:#f8fafc;color:#111827}
-  header{background:#0b6ef3;color:#fff;padding:12px 16px}
-  .container{max-width:1100px;margin:0 auto;padding:16px}
-  .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin-bottom:14px}
-  input,button{padding:10px;border-radius:10px;border:1px solid #d1d5db;font-size:14px}
-  button{background:#0b6ef3;color:#fff;border:0;cursor:pointer}
-  .row{display:flex;gap:10px;flex-wrap:wrap}
-  .muted{color:#64748b;font-size:13px}
-  .right{margin-left:auto}
-</style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>RSPS • Accounts Dashboard</title>
+  <!-- RSPS BUILD v5 -->
+  <style>
+    :root{ --brand:#0b6ef3; --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --bg:#f8fafc; --card:#fff; --ok:#16a34a; --err:#ef4444; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto;color:var(--ink);background:var(--bg)}
+    header{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:10px 16px;font-weight:800;display:flex;justify-content:space-between;align-items:center}
+    main.container{max-width:1100px;margin:0 auto;padding:16px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+    h2{margin:0 0 10px} h3{margin:0 0 8px} h4{margin:0 0 6px}
+    .btn{background:var(--brand);color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+    .btn-outline{background:#fff;color:var(--brand);border:1px solid var(--brand);border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-top:1px solid var(--line);padding:8px;text-align:left;font-size:14px;vertical-align:top}
+    input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:10px;font-size:14px}
+    .grid{display:grid;gap:10px}
+    .form-rows{display:grid;grid-template-columns:1fr 2fr;gap:10px;align-items:center}
+    @media (max-width:760px){.form-rows{grid-template-columns:1fr}}
+    .form-rows label{font-weight:600;font-size:14px}
+    .muted{color:var(--muted);font-size:13px}
+    .ok{color:var(--ok)} .err{color:var(--err)}
+    .hidden{display:none!important}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  </style>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script>
+    const sb = supabase.createClient(
+      "https://eqbbddsjutlupckqzlpq.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmJkZHNqdXRsdXBja3F6bHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDkzOTMsImV4cCI6MjA3MDIyNTM5M30.CVmsiBCCp98ZQQOEe-1QgrvcJGeRP4DGHUx6j0wPCRI"
+    );
+    async function ensureRole(role){
+      const { data:{user} } = await sb.auth.getUser();
+      if(!user){ location.href='index.html#login'; return; }
+      const { data:p } = await sb.from('profiles').select('role,full_name,email').eq('user_id',user.id).single();
+      if(!p || p.role!==role){ alert('Access denied for '+role); location.href='index.html#login'; return; }
+      const who = document.getElementById('who'); if(who) who.textContent=(p.full_name?p.full_name+' ('+p.role+')':(p.email+' ('+p.role+')'));
+    }
+    // helpers
+    const el = (id)=>document.getElementById(id);
+    const isTen = (s)=>/^\d{10}$/.test(s||'');
+    const isAadhaar = (s)=>/^\d{12}$/.test(s||'');
+    const hasNoDigits = (s)=>!/\d/.test(s||'');
+  </script>
 </head>
 <body>
-<header>
-  <div class="container">
-    <strong>Accounts Dashboard</strong>
-    <span id="who" class="muted"></span>
-    <button id="logout" class="right">Logout</button>
-  </div>
-</header>
+<header>Accounts Dashboard <span class="muted" id="who"></span> <a class="btn-outline" href="index.html#login">Logout</a></header>
 
 <main class="container">
-
-  <!-- Quick Fees Console (Demo only) -->
   <div class="card">
-    <h3>Quick Fees Console (Demo)</h3>
-    <div class="row">
-      <div>
-        <label>Admission No.</label><br/>
-        <input id="acctAdm" placeholder="RSPS/2025/0123" />
-      </div>
-      <div>
-        <label>Month</label><br/>
-        <input id="acctMonth" placeholder="e.g., July 2025" />
-      </div>
-      <div>
-        <label>Amount (₹)</label><br/>
-        <input id="acctAmount" type="number" min="0" step="1" placeholder="1200" />
-      </div>
-      <div>
-        <label>Mode</label><br/>
-        <input id="acctMode" placeholder="UPI / NEFT / CASH" />
-      </div>
-      <div>
-        <label>UTR/Ref (optional)</label><br/>
-        <input id="acctUtr" placeholder="Bank ref no." />
+    <h3>Students — Add / Edit</h3>
+    <p class="muted">Required fields are marked with *.</p>
+
+    <div class="form-rows">
+      <label>Admission Number*</label><input id="st_admission_no" placeholder="RSPS/2026/0012" />
+      <label>Class Section*</label><input id="st_class_section" placeholder="A" />
+      <label>Student Name*</label><input id="st_full_name" inputmode="text" />
+      <label>Session*</label><input id="st_session" placeholder="2026-27" />
+      <label>Father Name*</label><input id="st_father_name" inputmode="text" />
+      <label>Mother Name*</label><input id="st_mother_name" inputmode="text" />
+      <label>Date of Birth*</label><input id="st_dob" type="date" />
+      <label>Date of Admission*</label><input id="st_admission_date" type="date" />
+      <label>Gender*</label>
+      <select id="st_gender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select>
+      <label>Aadhaar (12 digits)*</label><input id="st_aadhar" placeholder="############" inputmode="numeric"/>
+      <label>Class*</label>
+      <select id="st_class">
+        <option value="">Select class</option>
+        <option>Nursery</option><option>LKG</option><option>UKG</option>
+        <option>Class 1</option><option>Class 2</option><option>Class 3</option><option>Class 4</option><option>Class 5</option>
+        <option>Class 6</option><option>Class 7</option><option>Class 8</option><option>Class 9</option><option>Class 10</option>
+      </select>
+      <label>Religion*</label><input id="st_religion" />
+      <label>Social Category*</label><input id="st_social" placeholder="GEN / SC / ST / OBC / EWS" />
+      <label>WhatsApp No.*</label><input id="st_whatsapp" placeholder="10-digit mobile" inputmode="numeric" />
+      <label>Father Contact No.*</label><input id="st_father_phone" placeholder="10-digit mobile" inputmode="numeric" />
+      <label>Address*</label><input id="st_address" placeholder="House, Village/Locality, Post, Tehsil, District" />
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h4>Transport</h4>
+      <div class="form-rows">
+        <label>Transport Availed*</label>
+        <div>
+          <label><input type="radio" name="st_transport_radio" value="true" id="tr_yes"> YES</label>
+          <label style="margin-left:12px"><input type="radio" name="st_transport_radio" value="false" id="tr_no" checked> NO</label>
+          <input id="st_transport" type="hidden" value="false"/>
+        </div>
+        <div id="tr_details" class="hidden" style="grid-column:1/-1">
+          <div class="form-rows">
+            <label>Pickup Bus No.</label><input id="st_pickup_bus"/>
+            <label>Drop Bus No.</label><input id="st_drop_bus"/>
+            <label>Is the bus no. same?</label><input type="checkbox" id="st_same_bus"/>
+            <label>Pickup Stoppage</label><input id="st_pickup_stop"/>
+            <label>Drop Stoppage</label><input id="st_drop_stop"/>
+            <label>Is pick-up and drop-off location same?</label><input type="checkbox" id="st_same_stop"/>
+          </div>
+        </div>
       </div>
     </div>
+
+    <div class="card" style="margin-top:12px">
+      <h4>Other Contacts</h4>
+      <div class="form-rows">
+        <label>Mother Contact No.</label><input id="st_mother_phone" inputmode="numeric"/>
+        <label>Neighbour Phone</label><input id="st_neigh_phone" inputmode="numeric"/>
+        <label>Relation (Neighbour)</label><input id="st_neigh_rel"/>
+        <label>Blood Group</label><input id="st_bgroup" placeholder="B+, O-, AB+"/>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h4>Siblings</h4>
+      <div class="form-rows">
+        <label>Real sibling in school?</label>
+        <div>
+          <label><input type="radio" name="st_sib_radio" value="true" id="sib_yes"> YES</label>
+          <label style="margin-left:12px"><input type="radio" name="st_sib_radio" value="false" id="sib_no" checked> NO</label>
+          <input id="st_has_sibling" type="hidden" value="false"/>
+        </div>
+        <div id="sib_details" class="hidden" style="grid-column:1/-1">
+          <div class="form-rows">
+            <label>Sibling names & classes</label><input id="st_siblings" placeholder="Asha (III-A); Mohit (VI-B)"/>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-rows" style="margin-top:10px">
+      <label>(Optional) Parent Email (link to portal)</label><input id="st_guardian_email" placeholder="parent@example.com"/>
+    </div>
+
     <div class="row" style="margin-top:10px">
-      <button id="btnRecord">Record Payment (Demo)</button>
-      <button id="btnReceipt">Generate Receipt (Demo)</button>
+      <button class="btn" id="st_save">Save / Add</button>
+      <button class="btn-outline" id="st_clear">Clear</button>
+      <span id="st_msg" class="muted"></span>
     </div>
-    <p class="muted">Note: Front-end demo only. We’ll wire real invoices/payments next.</p>
   </div>
 
-<div class="card">
-  <h3>Students — Add / Edit</h3>
-  <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
-    <input id="st_admission_no" placeholder="Admission Number*" />
-    <input id="st_class_section" placeholder="Class Section* (e.g., A)" />
-    <input id="st_full_name" placeholder="Student Name*" />
-    <input id="st_session" placeholder="Session* (e.g., 2026-27)" />
-    <input id="st_father_name" placeholder="Father Name*" />
-    <input id="st_mother_name" placeholder="Mother Name*" />
-    <input id="st_dob" type="date" placeholder="DOB*" />
-    <select id="st_gender">
-      <option value="">Gender*</option><option>Male</option><option>Female</option><option>Other</option>
-    </select>
-    <input id="st_aadhar" placeholder="Aadhaar (12 digits)*" />
-    <input id="st_admission_date" type="date" placeholder="Admission Date*" />
-    <select id="st_class"></select>
-    <input id="st_religion" placeholder="Religion*" />
-    <input id="st_social" placeholder="Social Category* (GEN/SC/ST/OBC/EWS...)" />
-    <input id="st_whatsapp" placeholder="WhatsApp No.*" />
-    <input id="st_father_phone" placeholder="Father Contact No.*" />
-    <input id="st_address" placeholder="Address*" style="grid-column:1/-1" />
-
-    <select id="st_transport">
-      <option value="false">Transport Availed? No</option>
-      <option value="true">Transport Availed? Yes</option>
-    </select>
-    <input id="st_buses_same" placeholder="Type 'same' if pickup & drop bus/stoppage are same" />
-    <input id="st_pickup_bus" placeholder="Pickup Bus No." />
-    <input id="st_drop_bus" placeholder="Drop Bus No." />
-    <input id="st_pickup_stop" placeholder="Pickup Stoppage" />
-    <input id="st_drop_stop" placeholder="Drop Stoppage" />
-
-    <input id="st_mother_phone" placeholder="Mother Contact No." />
-    <input id="st_neigh_phone" placeholder="Neighbour Phone" />
-    <input id="st_neigh_rel" placeholder="Neighbour Relation" />
-    <input id="st_bgroup" placeholder="Blood Group" />
-    <select id="st_has_sibling">
-      <option value="false">Real sibling in school? No</option>
-      <option value="true">Real sibling in school? Yes</option>
-    </select>
-    <input id="st_siblings" placeholder="Sibling names & classes; separate with ;" style="grid-column:1/-1" />
-
-    <input id="st_guardian_email" placeholder="(Optional) Parent portal email to link" style="grid-column:1/-1" />
-  </div>
-  <div class="row" style="margin-top:10px">
-    <button id="st_save">Save / Add</button>
-    <button id="st_clear" class="btn-outline" style="background:#fff;color:#0b6ef3;border:1px solid #0b6ef3">Clear</button>
-  </div>
-  <p id="st_msg" class="muted"></p>
-</div>
-
-  <!-- Coming soon panels -->
   <div class="card">
-    <h3>Shortcuts</h3>
-    <ul>
-      <li>Create monthly invoices (coming soon)</li>
-      <li>View discount requests (coming soon)</li>
-      <li>Send fee due reminders (coming soon)</li>
-    </ul>
+    <h3>All Students</h3>
+    <input id="st_search" placeholder="Search by name / Aadhaar / phone / admission no." style="margin-bottom:8px;width:100%"/>
+    <table>
+      <thead><tr><th>Adm No.</th><th>Name</th><th>Class</th><th>Father</th><th>Phones</th><th>Aadhaar</th><th>Actions</th></tr></thead>
+      <tbody id="st_rows"></tbody>
+    </table>
   </div>
 </main>
 
-<!-- Students (Accounts/Admin) -->
-
-
-<div class="card">
-  <h3>All Students</h3>
-  <input id="st_search" placeholder="Search by name / Aadhaar / phone / admission no." style="margin-bottom:8px;width:100%" />
-  <table>
-    <thead>
-      <tr><th>Adm No.</th><th>Name</th><th>Class</th><th>Father</th><th>Phones</th><th>Aadhaar</th><th>Actions</th></tr>
-    </thead>
-    <tbody id="st_rows"></tbody>
-  </table>
-</div>
-
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-
 <script>
-  const sb = supabase.createClient(
-    "https://eqbbddsjutlupckqzlpq.supabase.co",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmJkZHNqdXRsdXBja3F6bHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDkzOTMsImV4cCI6MjA3MDIyNTM5M30.CVmsiBCCp98ZQQOEe-1QgrvcJGeRP4DGHUx6j0wPCRI"
-  );
-
-  async function ensureRole(roleNeeded){
-    const { data: { user } } = await sb.auth.getUser();
-    if(!user){ location.href='index.html#login'; return; }
-    const { data: p, error } = await sb.from('profiles').select('full_name, role').eq('user_id', user.id).single();
-    if(error || !p || p.role !== roleNeeded){ alert('Access denied'); location.href='index.html'; return; }
-    document.getElementById('who').textContent = ` | ${p.full_name} (${p.role})`;
+  // transport toggles
+  function syncTransportRadios(){
+    const yes = el('tr_yes').checked;
+    el('st_transport').value = yes ? 'true':'false';
+    el('tr_details').classList.toggle('hidden', !yes);
   }
-
-  document.getElementById('logout').onclick = async () => { await sb.auth.signOut(); location.href='index.html#login'; };
-
-  // Demo buttons
-  document.getElementById('btnRecord').onclick = ()=>alert('Demo: Payment recorded (not saved).');
-  document.getElementById('btnReceipt').onclick = ()=>alert('Demo: Receipt PDF generated.');
-
-  ensureRole('accounts');
-</script>
-
-
-<script>
-  // ===== Students CRUD (Accounts/Admin) =====
-  let editingId = null;
-
-  function getEl(id){ return document.getElementById(id); }
-
-  async function loadClassesForAccounts(){
-    const { data: cls } = await sb.from('classes').select('id,name').order('name');
-    const sel = getEl('st_class'); sel.innerHTML = '';
-    (cls||[]).forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o); });
+  function syncSameBus(){
+    const same = el('st_same_bus').checked;
+    const pu = el('st_pickup_bus'), dr = el('st_drop_bus');
+    if(same){ dr.value=pu.value; dr.setAttribute('disabled','disabled'); } else { dr.removeAttribute('disabled'); }
   }
-
-  async function linkGuardian(email){
-    if(!email) return null;
-    const { data: p } = await sb.from('profiles').select('user_id').eq('email', email).maybeSingle();
-    return p?.user_id || null;
+  function syncSameStop(){
+    const same = el('st_same_stop').checked;
+    const pu = el('st_pickup_stop'), dr = el('st_drop_stop');
+    if(same){ dr.value=pu.value; dr.setAttribute('disabled','disabled'); } else { dr.removeAttribute('disabled'); }
   }
 
   function readForm(){
     return {
-      admission_no: getEl('st_admission_no').value.trim(),
-      class_section: getEl('st_class_section').value.trim(),
-      student_name: getEl('st_full_name').value.trim(),
-      session: getEl('st_session').value.trim(),
-      father_name: getEl('st_father_name').value.trim(),
-      mother_name: getEl('st_mother_name').value.trim(),
-      dob: getEl('st_dob').value,
-      address: getEl('st_address').value.trim(),
-      gender: getEl('st_gender').value,
-      aadhar_no: getEl('st_aadhar').value.trim(),
-      admission_date: getEl('st_admission_date').value,
-      admitted_class_id: Number(getEl('st_class').value || null),
-      religion: getEl('st_religion').value.trim(),
-      social_category: getEl('st_social').value.trim(),
-      whatsapp_no: getEl('st_whatsapp').value.trim(),
-      father_contact_no: getEl('st_father_phone').value.trim(),
-      transport_availed: getEl('st_transport').value === 'true',
-      buses_same: (getEl('st_buses_same').value.trim().toLowerCase()==='same'),
-      pickup_bus_no: getEl('st_pickup_bus').value.trim(),
-      drop_bus_no: getEl('st_drop_bus').value.trim(),
-      pickup_stoppage: getEl('st_pickup_stop').value.trim(),
-      drop_stoppage: getEl('st_drop_stop').value.trim(),
-      mother_contact_no: getEl('st_mother_phone').value.trim(),
-      neighbour_contact_no: getEl('st_neigh_phone').value.trim(),
-      neighbour_relation: getEl('st_neigh_rel').value.trim(),
-      blood_group: getEl('st_bgroup').value.trim(),
-      has_sibling: getEl('st_has_sibling').value === 'true',
-      sibling_names: getEl('st_siblings').value.trim() ? getEl('st_siblings').value.trim().split(';').map(s=>s.trim()) : null,
-      sibling_classes: null,
-      govt_scheme: null,
-      guardian_email: getEl('st_guardian_email').value.trim()
+      admission_no: el('st_admission_no').value.trim(),
+      class_section: el('st_class_section').value.trim(),
+      student_name: el('st_full_name').value.trim(),
+      session: el('st_session').value.trim(),
+      father_name: el('st_father_name').value.trim(),
+      mother_name: el('st_mother_name').value.trim(),
+      dob: el('st_dob').value,
+      admission_date: el('st_admission_date').value,
+      address: el('st_address').value.trim(),
+      gender: el('st_gender').value,
+      aadhar_no: el('st_aadhar').value.trim(),
+      admitted_class_id: el('st_class').value,
+      religion: el('st_religion').value.trim(),
+      social_category: el('st_social').value.trim(),
+      whatsapp_no: el('st_whatsapp').value.trim(),
+      father_contact_no: el('st_father_phone').value.trim(),
+      transport_availed: el('st_transport').value==='true',
+      pickup_bus_no: el('st_pickup_bus').value.trim(),
+      drop_bus_no: el('st_drop_bus').value.trim(),
+      pickup_stoppage: el('st_pickup_stop').value.trim(),
+      drop_stoppage: el('st_drop_stop').value.trim(),
+      mother_contact_no: el('st_mother_phone').value.trim(),
+      neighbour_contact_no: el('st_neigh_phone').value.trim(),
+      neighbour_relation: el('st_neigh_rel').value.trim(),
+      blood_group: el('st_bgroup').value.trim(),
+      has_sibling: el('st_has_sibling').value==='true',
+      sibling_names: el('st_siblings').value.trim() ? el('st_siblings').value.trim().split(';').map(s=>s.trim()) : null,
+      guardian_email: el('st_guardian_email').value.trim()
     };
   }
 
-  function clearForm(){
-    editingId=null;
-    ['st_admission_no','st_class_section','st_full_name','st_session','st_father_name','st_mother_name','st_dob','st_address','st_gender','st_aadhar','st_admission_date','st_religion','st_social','st_whatsapp','st_father_phone','st_pickup_bus','st_drop_bus','st_pickup_stop','st_drop_stop','st_mother_phone','st_neigh_phone','st_neigh_rel','st_bgroup','st_siblings','st_guardian_email','st_buses_same'].forEach(id=>{ const el=getEl(id); if(el) el.value=''; });
+  function validate(v){
+    const m = el('st_msg'); m.classList.remove('ok','err'); m.textContent='';
+    if(!v.admission_no) return m.textContent='Admission Number is required.', m.classList.add('err'), false;
+    if(!v.class_section) return m.textContent='Class Section is required.', m.classList.add('err'), false;
+    if(!v.student_name || !hasNoDigits(v.student_name)) return m.textContent='Student name is required (no numbers).', m.classList.add('err'), false;
+    if(!v.session) return m.textContent='Session is required.', m.classList.add('err'), false;
+    if(!v.father_name || !hasNoDigits(v.father_name)) return m.textContent='Father name invalid (no numbers).', m.classList.add('err'), false;
+    if(!v.mother_name || !hasNoDigits(v.mother_name)) return m.textContent='Mother name invalid (no numbers).', m.classList.add('err'), false;
+    if(!v.dob) return m.textContent='Date of Birth is required.', m.classList.add('err'), false;
+    if(!v.admission_date) return m.textContent='Date of Admission is required.', m.classList.add('err'), false;
+    if(!v.gender) return m.textContent='Gender is required.', m.classList.add('err'), false;
+    if(!isAadhaar(v.aadhar_no)) return m.textContent='Aadhaar must be exactly 12 digits.', m.classList.add('err'), false;
+    if(!v.admitted_class_id) return m.textContent='Class is required.', m.classList.add('err'), false;
+    if(!v.religion) return m.textContent='Religion is required.', m.classList.add('err'), false;
+    if(!v.social_category) return m.textContent='Social category is required.', m.classList.add('err'), false;
+    if(!isTen(v.whatsapp_no)) return m.textContent='WhatsApp number must be 10 digits.', m.classList.add('err'), false;
+    if(!isTen(v.father_contact_no)) return m.textContent='Father contact must be 10 digits.', m.classList.add('err'), false;
+    if(v.transport_availed){
+      if(!v.pickup_bus_no) return m.textContent='Pickup Bus No. required when Transport = YES.', m.classList.add('err'), false;
+      if(!v.pickup_stoppage) return m.textContent='Pickup Stoppage required when Transport = YES.', m.classList.add('err'), false;
+    }
+    return true;
+  }
+
+  async function linkGuardian(email){
+    if(!email) return null;
+    const { data:p } = await sb.from('profiles').select('user_id').eq('email', email).maybeSingle();
+    return p?.user_id || null;
+  }
+
+  let editingId = null;
+
+  async function listStudents(){
+    const q = el('st_search').value.trim();
+    let req = sb.from('students').select('id, admission_no, class_section, student_name, father_name, father_contact_no, whatsapp_no, aadhar_no, admitted_class_id').order('student_name');
+    if(q) req = req.or(`student_name.ilike.%${q}%,aadhar_no.ilike.%${q}%,father_contact_no.ilike.%${q}%,whatsapp_no.ilike.%${q}%,admission_no.ilike.%${q}%`);
+    const { data: rows } = await req;
+    const tb = el('st_rows'); tb.innerHTML='';
+    (rows||[]).forEach(r=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${r.admission_no||''}</td>
+        <td>${r.student_name||''}</td>
+        <td>${r.admitted_class_id||''} (${r.class_section||''})</td>
+        <td>${r.father_name||''}</td>
+        <td>${r.father_contact_no||''}${r.whatsapp_no?(' / '+r.whatsapp_no):''}</td>
+        <td>${r.aadhar_no||''}</td>
+        <td>
+          <button class="btn-outline editBtn" data-id="${r.id}">Edit</button>
+          <button class="btn-outline delBtn" data-id="${r.id}">Request Delete</button>
+        </td>`;
+      tb.appendChild(tr);
+    });
+    document.querySelectorAll('.editBtn').forEach(b=>b.onclick=()=>loadForEdit(b.dataset.id));
+    document.querySelectorAll('.delBtn').forEach(b=>b.onclick=()=>requestDelete(b.dataset.id));
+  }
+
+  async function loadForEdit(id){
+    const { data:r } = await sb.from('students').select('*').eq('id', id).single();
+    editingId = id;
+    el('st_admission_no').value = r.admission_no||'';
+    el('st_class_section').value = r.class_section||'';
+    el('st_full_name').value = r.student_name||'';
+    el('st_session').value = r.session||'';
+    el('st_father_name').value = r.father_name||'';
+    el('st_mother_name').value = r.mother_name||'';
+    el('st_dob').value = r.dob||'';
+    el('st_admission_date').value = r.admission_date||'';
+    el('st_gender').value = r.gender||'';
+    el('st_aadhar').value = r.aadhar_no||'';
+    el('st_class').value = r.admitted_class_id||'';
+    el('st_religion').value = r.religion||'';
+    el('st_social').value = r.social_category||'';
+    el('st_whatsapp').value = r.whatsapp_no||'';
+    el('st_father_phone').value = r.father_contact_no||'';
+    el('st_address').value = r.address||'';
+    if (r.transport_availed){ el('tr_yes').checked = true; } else { el('tr_no').checked = true; }
+    syncTransportRadios();
+    el('st_pickup_bus').value = r.pickup_bus_no||'';
+    el('st_drop_bus').value = r.drop_bus_no||'';
+    el('st_pickup_stop').value = r.pickup_stoppage||'';
+    el('st_drop_stop').value = r.drop_stoppage||'';
+    el('st_has_sibling').value = r.has_sibling ? 'true':'false';
+    if (r.has_sibling){ el('sib_yes').checked = true; } else { el('sib_no').checked = true; }
+    document.getElementById('sib_details').classList.toggle('hidden', !r.has_sibling);
+    el('st_siblings').value = (r.sibling_names||[]).join('; ');
+    el('st_guardian_email').value = '';
+    el('st_msg').textContent = 'Editing mode — make changes and press Save.';
   }
 
   async function saveStudent(){
     const v = readForm();
-    // Required fields check
-    if(!v.admission_no || !v.class_section || !v.student_name || !v.session || !v.father_name || !v.mother_name ||
-       !v.dob || !v.address || !v.gender || !v.aadhar_no || !v.admission_date || !v.admitted_class_id ||
-       !v.religion || !v.social_category || !v.whatsapp_no || !v.father_contact_no){
-      getEl('st_msg').textContent = 'Please fill all * fields.'; return;
-    }
+    syncTransportRadios();
+    if (el('st_same_bus').checked) v.drop_bus_no = v.pickup_bus_no;
+    if (el('st_same_stop').checked) v.drop_stoppage = v.pickup_stoppage;
+    if (el('sib_yes').checked) v.has_sibling = true; else { v.has_sibling = false; v.sibling_names = null; }
+    if(!validate(v)) return;
 
     const guardian_user_id = await linkGuardian(v.guardian_email);
     delete v.guardian_email;
 
     const payload = { ...v, guardian_user_id };
-    if (v.buses_same){ payload.drop_bus_no = v.pickup_bus_no; payload.drop_stoppage = v.pickup_stoppage; }
-
+    const { data:{ user } } = await sb.auth.getUser();
     let res;
     if (editingId){
-      payload.updated_by = (await sb.auth.getUser()).data.user.id;
+      payload.updated_by = user.id;
       res = await sb.from('students').update(payload).eq('id', editingId).select().single();
+      el('st_msg').textContent = res.error ? ('Error: '+res.error.message) : 'Updated successfully';
+      el('st_msg').className = res.error ? 'muted err':'muted ok';
     } else {
-      payload.created_by = (await sb.auth.getUser()).data.user.id;
+      payload.created_by = user.id;
       res = await sb.from('students').insert(payload).select().single();
+      el('st_msg').textContent = res.error ? ('Error: '+res.error.message) : 'Added successfully';
+      el('st_msg').className = res.error ? 'muted err':'muted ok';
     }
-    getEl('st_msg').textContent = res.error ? ('Error: '+res.error.message) : 'Saved.';
-    if (!res.error){ clearForm(); await listStudents(); }
+    if (!res.error){ clearForm(); listStudents(); }
   }
 
-  async function listStudents(){
-    const q = getEl('st_search').value.trim();
-    let req = sb.from('students').select(
-      'id, admission_no, class_section, student_name, father_name, father_contact_no, whatsapp_no, aadhar_no, admitted_class_id'
-    ).order('student_name');
-    if(q){
-      req = req.or(`student_name.ilike.%${q}%,aadhar_no.ilike.%${q}%,father_contact_no.ilike.%${q}%,whatsapp_no.ilike.%${q}%,admission_no.ilike.%${q}%`);
-    }
-    const { data: rows } = await req;
-    const { data: classes } = await sb.from('classes').select('id,name');
-    const cmap = Object.fromEntries((classes||[]).map(c=>[c.id,c.name]));
-    const tb = document.getElementById('st_rows'); tb.innerHTML='';
-    (rows||[]).forEach(r=>{
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${r.admission_no||''}</td>
-        <td>${r.student_name}</td>
-        <td>${cmap[r.admitted_class_id]||''} (${r.class_section||''})</td>
-        <td>${r.father_name||''}</td>
-        <td>${r.father_contact_no||''}${r.whatsapp_no?(' / '+r.whatsapp_no):''}</td>
-        <td>${r.aadhar_no||''}</td>
-        <td>
-          <button data-id="${r.id}" class="editBtn">Edit</button>
-          <button data-id="${r.id}" class="delBtn" style="background:#fff;color:#0b6ef3;border:1px solid #0b6ef3">Request Delete</button>
-        </td>`;
-      tb.appendChild(tr);
+  function clearForm(){
+    editingId = null;
+    ['st_admission_no','st_class_section','st_full_name','st_session','st_father_name','st_mother_name','st_dob','st_admission_date','st_gender','st_aadhar','st_religion','st_social','st_whatsapp','st_father_phone','st_address','st_pickup_bus','st_drop_bus','st_pickup_stop','st_drop_stop','st_mother_phone','st_neigh_phone','st_neigh_rel','st_bgroup','st_siblings','st_guardian_email'].forEach(id=>{
+      const e=el(id); if(e) e.value='';
     });
-    document.querySelectorAll('.editBtn').forEach(b=>b.onclick = ()=>loadForEdit(b.dataset.id));
-    document.querySelectorAll('.delBtn').forEach(b=>b.onclick = ()=>requestDelete(b.dataset.id));
-  }
-
-  async function loadForEdit(id){
-    const { data: r } = await sb.from('students').select('*').eq('id', id).single();
-    editingId = id;
-    getEl('st_admission_no').value = r.admission_no||'';
-    getEl('st_class_section').value = r.class_section||'';
-    getEl('st_full_name').value = r.student_name||'';
-    getEl('st_session').value = r.session||'';
-    getEl('st_father_name').value = r.father_name||'';
-    getEl('st_mother_name').value = r.mother_name||'';
-    getEl('st_dob').value = r.dob||'';
-    getEl('st_address').value = r.address||'';
-    getEl('st_gender').value = r.gender||'';
-    getEl('st_aadhar').value = r.aadhar_no||'';
-    getEl('st_admission_date').value = r.admission_date||'';
-    getEl('st_class').value = r.admitted_class_id||'';
-    getEl('st_religion').value = r.religion||'';
-    getEl('st_social').value = r.social_category||'';
-    getEl('st_whatsapp').value = r.whatsapp_no||'';
-    getEl('st_father_phone').value = r.father_contact_no||'';
-    getEl('st_transport').value = r.transport_availed ? 'true' : 'false';
-    getEl('st_pickup_bus').value = r.pickup_bus_no||'';
-    getEl('st_drop_bus').value = r.drop_bus_no||'';
-    getEl('st_pickup_stop').value = r.pickup_stoppage||'';
-    getEl('st_drop_stop').value = r.drop_stoppage||'';
-    getEl('st_mother_phone').value = r.mother_contact_no||'';
-    getEl('st_neigh_phone').value = r.neighbour_contact_no||'';
-    getEl('st_neigh_rel').value = r.neighbour_relation||'';
-    getEl('st_bgroup').value = r.blood_group||'';
-    getEl('st_has_sibling').value = r.has_sibling ? 'true' : 'false';
-    getEl('st_siblings').value = (r.sibling_names||[]).join('; ');
-    getEl('st_msg').textContent = 'Editing mode — make changes and press Save.';
+    el('st_class').value='';
+    el('tr_no').checked = true; syncTransportRadios();
+    el('st_same_bus').checked=false; el('st_same_stop').checked=false;
+    el('sib_no').checked = true; document.getElementById('sib_details').classList.add('hidden');
+    el('st_msg').textContent='';
   }
 
   async function requestDelete(id){
     const reason = prompt('Reason for delete?');
-    if (reason === null) return;
-    const { data: me } = await sb.auth.getUser();
-    const payload = { table_name:'students', row_id:id, reason, requested_by: me.user.id, status:'pending' };
+    if (reason===null) return;
+    const { data:{user} } = await sb.auth.getUser();
+    const payload = { table_name:'students', row_id:id, reason, requested_by:user.id, status:'pending' };
     const { error } = await sb.from('delete_requests').insert(payload);
     alert(error ? ('Error: '+error.message) : 'Delete request sent to Admin.');
   }
 
-  // Wire up
+  // events
   document.getElementById('st_save').onclick = saveStudent;
-  document.getElementById('st_clear').onclick = ()=>{ clearForm(); getEl('st_msg').textContent=''; };
+  document.getElementById('st_clear').onclick = clearForm;
   document.getElementById('st_search').oninput = listStudents;
+  document.getElementById('tr_yes').addEventListener('change', syncTransportRadios);
+  document.getElementById('tr_no').addEventListener('change', syncTransportRadios);
+  document.getElementById('st_same_bus').addEventListener('change', syncSameBus);
+  document.getElementById('st_same_stop').addEventListener('change', syncSameStop);
 
-  (async()=>{ await loadClassesForAccounts(); await listStudents(); })();
+  (async()=>{ await ensureRole('accounts'); syncTransportRadios(); await listStudents(); })();
 </script>
-
-
-
 </body>
 </html>
