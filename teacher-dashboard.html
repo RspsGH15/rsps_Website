@@ -3,7 +3,6 @@
 <head>
   <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>RSPS • Teacher Dashboard</title>
-  <!-- RSPS BUILD v5 -->
   <style>
     :root{ --brand:#0b6ef3; --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --bg:#f8fafc; --card:#fff; --ok:#16a34a; --err:#ef4444; }
     *{box-sizing:border-box}
@@ -11,35 +10,36 @@
     header{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:10px 16px;font-weight:800;display:flex;justify-content:space-between;align-items:center}
     main.container{max-width:1100px;margin:0 auto;padding:16px}
     .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
-    h2{margin:0 0 10px} h3{margin:0 0 8px} h4{margin:0 0 6px}
+    h3{margin:0 0 8px} h4{margin:0 0 6px}
     .btn{background:var(--brand);color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
     .btn-outline{background:#fff;color:var(--brand);border:1px solid var(--brand);border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
     table{width:100%;border-collapse:collapse}
     th,td{border-top:1px solid var(--line);padding:8px;text-align:left;font-size:14px;vertical-align:top}
     input,select,textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:10px;font-size:14px}
     .grid{display:grid;gap:10px}
-    .form-rows{display:grid;grid-template-columns:1fr 2fr;gap:10px;align-items:center}
-    @media (max-width:760px){.form-rows{grid-template-columns:1fr}}
-    .form-rows label{font-weight:600;font-size:14px}
     .muted{color:var(--muted);font-size:13px}
-    .ok{color:var(--ok)} .err{color:var(--err)}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .hidden{display:none!important}
   </style>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script>
+    // ==== SUPABASE (same project as other pages) ====
     const sb = supabase.createClient(
       "https://eqbbddsjutlupckqzlpq.supabase.co",
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxYmJkZHNqdXRsdXBja3F6bHBxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ2NDkzOTMsImV4cCI6MjA3MDIyNTM5M30.CVmsiBCCp98ZQQOEe-1QgrvcJGeRP4DGHUx6j0wPCRI"
     );
-    async function ensureRole(role){
+    const el = id=>document.getElementById(id);
+    const isTen = s=>/^\d{10}$/.test(s||'');
+    const hasNoDigits = s=>!/\d/.test(s||'');
+
+    async function ensureTeacher(){
       const { data:{user} } = await sb.auth.getUser();
-      if(!user){ location.href='index.html#login'; return; }
+      if(!user) { location.href='index.html#login'; return null; }
       const { data:p } = await sb.from('profiles').select('role,full_name,email').eq('user_id',user.id).single();
-      if(!p || p.role!==role){ alert('Access denied for '+role); location.href='index.html#login'; return; }
-      const who = document.getElementById('who'); if(who) who.textContent=(p.full_name?p.full_name+' ('+p.role+')':(p.email+' ('+p.role+')'));
+      if(!p || p.role!=='teacher'){ alert('Access denied for teacher'); location.href='index.html#login'; return null; }
+      const who = el('who'); if(who) who.textContent=(p.full_name?p.full_name+' (teacher)':(p.email+' (teacher)'));
+      return user;
     }
-    const el = (id)=>document.getElementById(id);
-    const isTen = (s)=>/^\d{10}$/.test(s||'');
-    const hasNoDigits = (s)=>!/\d/.test(s||'');
   </script>
 </head>
 <body>
@@ -47,53 +47,87 @@
 
 <main class="container">
   <div class="card">
-    <h3>Students (All) — you can edit only your class</h3>
-    <input id="tst_search" placeholder="Search by name / Aadhaar / phone / admission no." style="margin-bottom:8px;width:100%"/>
+    <h3>Students — you can edit only your own class/section</h3>
+    <div class="row">
+      <input id="tst_search" placeholder="Search by name / Aadhaar / phone / admission no." style="flex:1;min-width:260px"/>
+      <button class="btn-outline" id="tst_refresh">Refresh</button>
+      <span id="tst_info" class="muted"></span>
+    </div>
     <table>
       <thead><tr><th>Adm No.</th><th>Name</th><th>Class</th><th>Section</th><th>Father</th><th>Phones</th><th>Aadhaar</th><th>Action</th></tr></thead>
       <tbody id="tst_rows"></tbody>
     </table>
   </div>
 
-  <div class="card" id="tst_edit" style="display:none">
+  <div class="card hidden" id="tst_edit">
     <h3>Edit Student (Your Class Only)</h3>
-    <div class="form-rows">
-      <label>Student Name*</label><input id="tst_full_name" inputmode="text"/>
-      <label>Father Phone*</label><input id="tst_father_phone" placeholder="10-digit mobile" inputmode="numeric"/>
-      <label>WhatsApp*</label><input id="tst_whatsapp" placeholder="10-digit mobile" inputmode="numeric"/>
-      <label>Address*</label><input id="tst_address" placeholder="House, Village, Post, Tehsil, District"/>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <div><label>Student Name*</label><input id="tst_full_name" inputmode="text"/></div>
+      <div><label>Address*</label><input id="tst_address" placeholder="House, Village, Post, Tehsil, District"/></div>
+      <div><label>Father Phone*</label><input id="tst_father_phone" placeholder="10-digit mobile" inputmode="numeric"/></div>
+      <div><label>WhatsApp*</label><input id="tst_whatsapp" placeholder="10-digit mobile" inputmode="numeric"/></div>
     </div>
-    <button class="btn" id="tst_save">Save</button>
-    <p class="muted" id="tst_msg"></p>
+    <div class="row" style="margin-top:8px">
+      <button class="btn" id="tst_save">Save</button>
+      <button class="btn-outline" id="tst_cancel">Cancel</button>
+      <span class="muted" id="tst_msg"></span>
+    </div>
   </div>
 
   <div class="card">
-    <h3>Class Docs — Syllabus / Date Sheet / Progress Image</h3>
-    <div class="form-rows">
-      <label>Syllabus to cover (session)</label><textarea id="syllabus_text" placeholder="Units/chapters..."></textarea>
-      <label>Tentative exam (title)</label><input id="exam_title" placeholder="Unit Test 1"/>
-      <label>Exam date</label><input id="exam_date" type="date"/>
-      <label>Date sheet (PDF/Link)</label><input id="date_sheet_url" placeholder="https://..."/>
-      <label>Daily progress image</label><input id="progress_img" type="file" accept="image/*"/>
+    <h3>Class Docs — Syllabus / Exam / Date Sheet / Progress</h3>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <div>
+        <h4>Post / Upload</h4>
+        <div class="grid" style="grid-template-columns:1fr">
+          <textarea id="syllabus_text" placeholder="Syllabus units/chapters… (saved to syllabus_units)"></textarea>
+          <input id="exam_title" placeholder="Exam title (exam_schedule)"/>
+          <input id="exam_date" type="date"/>
+          <input id="date_sheet_url" placeholder="Date sheet PDF/Link (date_sheets.link)"/>
+          <input id="progress_img" type="file" accept="image/*"/>
+          <button class="btn" id="save_docs">Post/Upload</button>
+          <span class="muted" id="docs_msg"></span>
+        </div>
+      </div>
+      <div>
+        <h4>Recent</h4>
+        <div id="recent_docs" class="grid"></div>
+      </div>
     </div>
-    <div class="row" style="margin-top:8px">
-      <button class="btn" id="save_docs">Post/Upload</button>
-      <span id="docs_msg" class="muted"></span>
-    </div>
+  </div>
+
+  <div class="card">
+    <h3>Academic Calendar & Holidays (read-only)</h3>
+    <div class="grid" id="acad" style="grid-template-columns:1fr 1fr"></div>
   </div>
 </main>
 
 <script>
-let T_EDIT_ID=null;
+let USER=null, ALLOWED = [];  // [{class_id:'Class 5', class_section:'A'}, ...]
+let EDIT_ID=null, EDIT_META=null; // {class_id, class_section}
 
-async function tListStudents(){
+async function getAllowedClasses(){
+  // class_teachers: assume columns user_id, class_id, class_section
+  const { data: rows } = await sb.from('class_teachers').select('class_id, class_section').eq('user_id', USER.id);
+  ALLOWED = rows || [];
+  const tag = ALLOWED.map(r=>`${r.class_id}${r.class_section?(' - '+r.class_section):''}`).join(', ');
+  el('tst_info').textContent = ALLOWED.length ? `Your classes: ${tag}` : 'No class mapped to your account yet.';
+}
+
+function canEdit(class_id, class_section){
+  return ALLOWED.some(r => String(r.class_id)===String(class_id) && String(r.class_section||'')===String(class_section||''));
+}
+
+async function listStudents(){
   const q = el('tst_search').value.trim();
-  let req = sb.from('students').select('id, admission_no, class_section, student_name, father_name, father_contact_no, whatsapp_no, aadhar_no, admitted_class_id').order('student_name');
+  let req = sb.from('students').select('id, admission_no, class_section, student_name, father_name, father_contact_no, whatsapp_no, aadhar_no, admitted_class_id, address').order('student_name');
   if(q) req = req.or(`student_name.ilike.%${q}%,aadhar_no.ilike.%${q}%,father_contact_no.ilike.%${q}%,whatsapp_no.ilike.%${q}%,admission_no.ilike.%${q}%`);
-  const { data: rows } = await req;
-  const tb=document.getElementById('tst_rows'); tb.innerHTML='';
+  const { data: rows, error } = await req;
+  const tb = el('tst_rows'); tb.innerHTML = '';
+  if(error){ tb.innerHTML = `<tr><td colspan="8" style="color:#ef4444">${error.message}</td></tr>`; return; }
   (rows||[]).forEach(r=>{
-    const tr=document.createElement('tr');
+    const mine = canEdit(r.admitted_class_id, r.class_section);
+    const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${r.admission_no||''}</td>
       <td>${r.student_name||''}</td>
@@ -102,63 +136,120 @@ async function tListStudents(){
       <td>${r.father_name||''}</td>
       <td>${r.father_contact_no||''}${r.whatsapp_no?(' / '+r.whatsapp_no):''}</td>
       <td>${r.aadhar_no||''}</td>
-      <td><button class="btn tEdit" data-id="${r.id}">Edit</button></td>`;
+      <td>${ mine ? `<button class="btn tEdit" data-id="${r.id}">Edit</button>` : `<span class="muted">Not your class</span>` }</td>`;
     tb.appendChild(tr);
   });
-  document.querySelectorAll('.tEdit').forEach(b=>b.onclick=()=>tLoadEdit(b.dataset.id));
+  document.querySelectorAll('.tEdit').forEach(b=>b.onclick=()=>loadEdit(b.dataset.id));
 }
 
-async function tLoadEdit(id){
-  const { data:r } = await sb.from('students').select('id, student_name, father_contact_no, whatsapp_no, address').eq('id', id).single();
-  T_EDIT_ID=id;
+async function loadEdit(id){
+  const { data:r, error } = await sb.from('students').select('id, student_name, father_contact_no, whatsapp_no, address, admitted_class_id, class_section').eq('id', id).single();
+  if(error){ alert(error.message); return; }
+  if(!canEdit(r.admitted_class_id, r.class_section)){ alert('You can edit only your own class/section.'); return; }
+  EDIT_ID = id;
+  EDIT_META = { class_id:r.admitted_class_id, class_section:r.class_section };
   el('tst_full_name').value = r.student_name||'';
   el('tst_father_phone').value = r.father_contact_no||'';
   el('tst_whatsapp').value = r.whatsapp_no||'';
   el('tst_address').value = r.address||'';
-  el('tst_edit').style.display='block';
-  el('tst_msg').textContent='You can save only if this student belongs to your class.';
+  el('tst_edit').classList.remove('hidden');
+  el('tst_msg').textContent='Editing allowed.';
 }
 
-document.getElementById('tst_save').onclick = async ()=>{
+el('tst_cancel').onclick = ()=>{ el('tst_edit').classList.add('hidden'); EDIT_ID=null; };
+
+el('tst_save').onclick = async ()=>{
+  if(!EDIT_ID) return;
   const nm = el('tst_full_name').value.trim();
   const fp = el('tst_father_phone').value.trim();
   const wa = el('tst_whatsapp').value.trim();
   const ad = el('tst_address').value.trim();
-  if(!nm || !hasNoDigits(nm)) return el('tst_msg').textContent='Invalid student name (no numbers).';
-  if(!isTen(fp)) return el('tst_msg').textContent='Father phone must be 10 digits.';
-  if(!isTen(wa)) return el('tst_msg').textContent='WhatsApp must be 10 digits.';
-  if(!ad) return el('tst_msg').textContent='Address is required.';
-  const payload = { student_name:nm, father_contact_no:fp, whatsapp_no:wa, address:ad };
-  const { error } = await sb.from('students').update(payload).eq('id', T_EDIT_ID);
-  el('tst_msg').textContent = error ? ('Error: '+error.message) : 'Saved.';
-  if(!error){ tListStudents(); }
+  const out = el('tst_msg');
+  if(!nm || !hasNoDigits(nm)) return out.textContent='Invalid student name (no numbers).';
+  if(!isTen(fp)) return out.textContent='Father phone must be 10 digits.';
+  if(!isTen(wa)) return out.textContent='WhatsApp must be 10 digits.';
+  if(!ad) return out.textContent='Address is required.';
+  // One last guard: verify still allowed
+  if(!canEdit(EDIT_META.class_id, EDIT_META.class_section)){ return out.textContent='Not your class — update blocked.'; }
+  const { error } = await sb.from('students').update({ student_name:nm, father_contact_no:fp, whatsapp_no:wa, address:ad }).eq('id', EDIT_ID);
+  if(error){ out.style.color='#ef4444'; out.textContent=error.message; }
+  else { out.style.color='#16a34a'; out.textContent='Saved.'; el('tst_edit').classList.add('hidden'); listStudents(); }
 };
 
-// docs (assumes tables + policies exist)
-document.getElementById('save_docs').onclick = async ()=>{
-  const text = el('syllabus_text').value.trim();
-  const title = el('exam_title').value.trim();
-  const edate = el('exam_date').value;
-  const durl  = el('date_sheet_url').value.trim();
-  const img   = el('progress_img').files[0];
-  const msg = el('docs_msg'); msg.textContent='';
-  try {
-    if (text)  await sb.from('syllabi').insert({ content:text });
-    if (title && edate) await sb.from('exam_dates').insert({ title, exam_date:edate });
-    if (durl) await sb.from('date_sheets').insert({ link:durl });
-    if (img) {
-      const key = `progress-${Date.now()}-${img.name}`;
-      const up  = await sb.storage.from('progress-reports').upload(key, img, { cacheControl: '3600', upsert: false });
-      if (up.error) throw up.error;
-      await sb.from('progress_reports').insert({ image_path:key });
-    }
-    msg.textContent='Uploaded/Posted.'; msg.className='ok';
-  } catch(err) {
-    msg.textContent='Error: '+(err.message||err); msg.className='err';
+async function saveDocs(){
+  // Determine teacher’s primary class/section (first mapping)
+  const tgt = ALLOWED[0];
+  if(!tgt){ el('docs_msg').textContent='No class mapped to you yet. Ask admin to map in class_teachers.'; return; }
+
+  const msg = el('docs_msg'); msg.textContent='Saving…';
+  // syllabus_units: columns (class_id, class_section, content)
+  const syl = el('syllabus_text').value.trim();
+  if(syl){
+    await sb.from('syllabus_units').insert({ class_id: tgt.class_id, class_section: tgt.class_section || null, content: syl });
   }
-};
+  // exam_schedule: (title, exam_date, class_id, class_section)
+  const et = el('exam_title').value.trim();
+  const ed = el('exam_date').value || null;
+  if(et){
+    await sb.from('exam_schedule').insert({ title: et, exam_date: ed, class_id: tgt.class_id, class_section: tgt.class_section || null });
+  }
+  // date_sheets: (title, link, class_id, class_section)
+  const link = el('date_sheet_url').value.trim();
+  if(link){
+    await sb.from('date_sheets').insert({ title: et || 'Date Sheet', link, class_id: tgt.class_id, class_section: tgt.class_section || null });
+  }
+  // progress_reports: upload image to storage bucket 'progress' then insert row (image_path, class_id/section optional)
+  const file = el('progress_img').files[0];
+  if(file){
+    const path = `${USER.id}/${Date.now()}-${file.name}`;
+    await sb.storage.from('progress').upload(path, file, { upsert:false });
+    await sb.from('progress_reports').insert({ image_path: path, class_id: tgt.class_id, class_section: tgt.class_section || null });
+  }
+  msg.textContent='Posted.';
+  el('syllabus_text').value=''; el('exam_title').value=''; el('exam_date').value=''; el('date_sheet_url').value=''; el('progress_img').value='';
+  loadRecent();
+}
 
-(async()=>{ await ensureRole('teacher'); await tListStudents(); })();
+async function loadRecent(){
+  const wrap = el('recent_docs'); wrap.innerHTML='';
+  const tgt = ALLOWED[0];
+  // pull latest few items for this teacher’s first mapped class
+  const [sy, ex, ds, pr] = await Promise.all([
+    sb.from('syllabus_units').select('id, content, created_at').eq('class_id', tgt?.class_id||'').order('created_at',{ascending:false}).limit(3),
+    sb.from('exam_schedule').select('id, title, exam_date, created_at').eq('class_id', tgt?.class_id||'').order('created_at',{ascending:false}).limit(3),
+    sb.from('date_sheets').select('id, title, link, created_at').eq('class_id', tgt?.class_id||'').order('created_at',{ascending:false}).limit(3),
+    sb.from('progress_reports').select('id, image_path, created_at').order('created_at',{ascending:false}).limit(6)
+  ]);
+  const card=html=>{ const d=document.createElement('div'); d.className='card'; d.innerHTML=html; return d; };
+  (sy.data||[]).forEach(s=>wrap.appendChild(card(`<h4>Syllabus</h4><p class="muted">${new Date(s.created_at).toLocaleString()}</p><div>${(s.content||'').slice(0,400)}</div>`)));
+  (ex.data||[]).forEach(e=>wrap.appendChild(card(`<h4>Exam</h4><p class="muted">${new Date(e.created_at).toLocaleString()}</p><div><strong>${e.title||''}</strong> — ${e.exam_date||''}</div>`)));
+  (ds.data||[]).forEach(d=>wrap.appendChild(card(`<h4>Date Sheet</h4><p class="muted">${new Date(d.created_at).toLocaleString()}</p><div><strong>${d.title||'Date Sheet'}</strong><br><a target="_blank" rel="noopener" href="${d.link||'#'}">Open</a></div>`)));
+  (pr.data||[]).forEach(p=>{
+    const url = p.image_path ? sb.storage.from('progress').getPublicUrl(p.image_path).data.publicUrl : '';
+    wrap.appendChild(card(`<h4>Daily Progress</h4><p class="muted">${new Date(p.created_at).toLocaleString()}</p>${url?`<img src="${url}" alt="progress" style="max-width:100%;border-radius:10px;border:1px solid #e5e7eb"/>`:''}`));
+  });
+  if(!wrap.children.length){ wrap.appendChild(card('<p class="muted">No items yet. Add from the left panel.</p>')); }
+}
+
+async function loadAcademic(){
+  const box = el('acad'); box.innerHTML='';
+  const ac = await sb.from('academic_calendar').select('date, title').order('date');
+  const ho = await sb.from('holidays').select('date, title').order('date');
+  const mk = (t,rows)=>{ const c=document.createElement('div'); c.className='card'; c.innerHTML=`<h4>${t}</h4>`+(rows||[]).map(r=>`<div>${r.date} — ${r.title}</div>`).join('') || '<p class="muted">No entries.</p>'; return c; };
+  box.appendChild(mk('Academic Calendar', ac.data));
+  box.appendChild(mk('Holidays', ho.data));
+}
+
+document.addEventListener('DOMContentLoaded', async ()=>{
+  USER = await ensureTeacher(); if(!USER) return;
+  await getAllowedClasses();
+  await listStudents();
+  await loadRecent();
+  await loadAcademic();
+  el('tst_refresh').onclick = listStudents;
+  el('tst_search').oninput = ()=>{ clearTimeout(window._t); window._t=setTimeout(listStudents, 300); };
+  el('save_docs').onclick = saveDocs;
+});
 </script>
 </body>
 </html>

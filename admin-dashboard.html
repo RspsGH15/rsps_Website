@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>RSPS • Admin Dashboard</title>
-  <!-- RSPS BUILD v5 -->
+  <!-- RSPS BUILD v6 -->
   <style>
     :root{ --brand:#0b6ef3; --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --bg:#f8fafc; --card:#fff; }
     *{box-sizing:border-box}
@@ -109,7 +109,6 @@ async function loadDeleteRequests(){
     tb.appendChild(tr);
   });
 }
-
 async function approveDel(reqId,rowId){
   const del = await sb.from('students').delete().eq('id', rowId);
   if (del.error) return alert('Delete failed: '+del.error.message);

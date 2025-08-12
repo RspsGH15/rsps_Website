@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>RSPS • Accounts Dashboard</title>
-  <!-- RSPS BUILD v5 -->
+  <!-- RSPS BUILD v6 -->
   <style>
     :root{ --brand:#0b6ef3; --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --bg:#f8fafc; --card:#fff; --ok:#16a34a; --err:#ef4444; }
     *{box-sizing:border-box}
@@ -40,7 +40,6 @@
       if(!p || p.role!==role){ alert('Access denied for '+role); location.href='index.html#login'; return; }
       const who = document.getElementById('who'); if(who) who.textContent=(p.full_name?p.full_name+' ('+p.role+')':(p.email+' ('+p.role+')'));
     }
-    // helpers
     const el = (id)=>document.getElementById(id);
     const isTen = (s)=>/^\d{10}$/.test(s||'');
     const isAadhaar = (s)=>/^\d{12}$/.test(s||'');
@@ -56,14 +55,14 @@
     <p class="muted">Required fields are marked with *.</p>
 
     <div class="form-rows">
-      <label>Admission Number*</label><input id="st_admission_no" placeholder="RSPS/2026/0012" />
-      <label>Class Section*</label><input id="st_class_section" placeholder="A" />
-      <label>Student Name*</label><input id="st_full_name" inputmode="text" />
-      <label>Session*</label><input id="st_session" placeholder="2026-27" />
-      <label>Father Name*</label><input id="st_father_name" inputmode="text" />
-      <label>Mother Name*</label><input id="st_mother_name" inputmode="text" />
-      <label>Date of Birth*</label><input id="st_dob" type="date" />
-      <label>Date of Admission*</label><input id="st_admission_date" type="date" />
+      <label>Admission Number*</label><input id="st_admission_no" placeholder="RSPS/2026/0012"/>
+      <label>Class Section*</label><input id="st_class_section" placeholder="A"/>
+      <label>Student Name*</label><input id="st_full_name" inputmode="text"/>
+      <label>Session*</label><input id="st_session" placeholder="2026-27"/>
+      <label>Father Name*</label><input id="st_father_name" inputmode="text"/>
+      <label>Mother Name*</label><input id="st_mother_name" inputmode="text"/>
+      <label>Date of Birth*</label><input id="st_dob" type="date"/>
+      <label>Date of Admission*</label><input id="st_admission_date" type="date"/>
       <label>Gender*</label>
       <select id="st_gender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select>
       <label>Aadhaar (12 digits)*</label><input id="st_aadhar" placeholder="############" inputmode="numeric"/>
@@ -74,30 +73,30 @@
         <option>Class 1</option><option>Class 2</option><option>Class 3</option><option>Class 4</option><option>Class 5</option>
         <option>Class 6</option><option>Class 7</option><option>Class 8</option><option>Class 9</option><option>Class 10</option>
       </select>
-      <label>Religion*</label><input id="st_religion" />
-      <label>Social Category*</label><input id="st_social" placeholder="GEN / SC / ST / OBC / EWS" />
-      <label>WhatsApp No.*</label><input id="st_whatsapp" placeholder="10-digit mobile" inputmode="numeric" />
-      <label>Father Contact No.*</label><input id="st_father_phone" placeholder="10-digit mobile" inputmode="numeric" />
-      <label>Address*</label><input id="st_address" placeholder="House, Village/Locality, Post, Tehsil, District" />
+      <label>Religion*</label><input id="st_religion"/>
+      <label>Social Category*</label><input id="st_social" placeholder="GEN / SC / ST / OBC / EWS"/>
+      <label>WhatsApp No.*</label><input id="st_whatsapp" placeholder="10-digit mobile" inputmode="numeric"/>
+      <label>Father Contact No.*</label><input id="st_father_phone" placeholder="10-digit mobile" inputmode="numeric"/>
+      <label>Address*</label><input id="st_address" placeholder="House, Village/Locality, Post, Tehsil, District"/>
     </div>
 
     <div class="card" style="margin-top:12px">
       <h4>Transport</h4>
       <div class="form-rows">
         <label>Transport Availed*</label>
-        <div>
-          <label><input type="radio" name="st_transport_radio" value="true" id="tr_yes"> YES</label>
-          <label style="margin-left:12px"><input type="radio" name="st_transport_radio" value="false" id="tr_no" checked> NO</label>
-          <input id="st_transport" type="hidden" value="false"/>
-        </div>
+        <select id="st_transport_select">
+          <option value="false">NO</option>
+          <option value="true">YES</option>
+        </select>
+        <input id="st_transport" type="hidden" value="false"/>
         <div id="tr_details" class="hidden" style="grid-column:1/-1">
           <div class="form-rows">
             <label>Pickup Bus No.</label><input id="st_pickup_bus"/>
-            <label>Drop Bus No.</label><input id="st_drop_bus"/>
-            <label>Is the bus no. same?</label><input type="checkbox" id="st_same_bus"/>
+            <label>Drop-off Bus No.</label><input id="st_drop_bus"/>
+            <label>Is Bus No. same for pickup & drop-off?</label><input type="checkbox" id="st_same_bus"/>
             <label>Pickup Stoppage</label><input id="st_pickup_stop"/>
-            <label>Drop Stoppage</label><input id="st_drop_stop"/>
-            <label>Is pick-up and drop-off location same?</label><input type="checkbox" id="st_same_stop"/>
+            <label>Drop-off Stoppage</label><input id="st_drop_stop"/>
+            <label>Is Stoppage same for pickup & drop-off?</label><input type="checkbox" id="st_same_stop"/>
           </div>
         </div>
       </div>
@@ -116,15 +115,16 @@
     <div class="card" style="margin-top:12px">
       <h4>Siblings</h4>
       <div class="form-rows">
-        <label>Real sibling in school?</label>
-        <div>
-          <label><input type="radio" name="st_sib_radio" value="true" id="sib_yes"> YES</label>
-          <label style="margin-left:12px"><input type="radio" name="st_sib_radio" value="false" id="sib_no" checked> NO</label>
-          <input id="st_has_sibling" type="hidden" value="false"/>
-        </div>
+        <label>Sibling in school?</label>
+        <select id="st_sibling_select">
+          <option value="false">NO</option>
+          <option value="true">YES</option>
+        </select>
+        <input id="st_has_sibling" type="hidden" value="false"/>
         <div id="sib_details" class="hidden" style="grid-column:1/-1">
           <div class="form-rows">
-            <label>Sibling names & classes</label><input id="st_siblings" placeholder="Asha (III-A); Mohit (VI-B)"/>
+            <label>Sibling name(s) & class(es)</label>
+            <input id="st_siblings" placeholder="Asha (III-A); Mohit (VI-B)"/>
           </div>
         </div>
       </div>
@@ -152,10 +152,10 @@
 </main>
 
 <script>
-  // transport toggles
-  function syncTransportRadios(){
-    const yes = el('tr_yes').checked;
-    el('st_transport').value = yes ? 'true':'false';
+  // Transport / Sibling toggles (dropdown-based)
+  function syncTransportUI(){
+    const yes = el('st_transport_select').value === 'true';
+    el('st_transport').value = yes ? 'true' : 'false';
     el('tr_details').classList.toggle('hidden', !yes);
   }
   function syncSameBus(){
@@ -167,6 +167,11 @@
     const same = el('st_same_stop').checked;
     const pu = el('st_pickup_stop'), dr = el('st_drop_stop');
     if(same){ dr.value=pu.value; dr.setAttribute('disabled','disabled'); } else { dr.removeAttribute('disabled'); }
+  }
+  function syncSiblingUI(){
+    const yes = el('st_sibling_select').value === 'true';
+    el('st_has_sibling').value = yes ? 'true' : 'false';
+    document.getElementById('sib_details').classList.toggle('hidden', !yes);
   }
 
   function readForm(){
@@ -278,57 +283,49 @@
     el('st_whatsapp').value = r.whatsapp_no||'';
     el('st_father_phone').value = r.father_contact_no||'';
     el('st_address').value = r.address||'';
-    if (r.transport_availed){ el('tr_yes').checked = true; } else { el('tr_no').checked = true; }
-    syncTransportRadios();
+    // Transport
+    el('st_transport_select').value = r.transport_availed ? 'true' : 'false';
+    syncTransportUI();
     el('st_pickup_bus').value = r.pickup_bus_no||'';
     el('st_drop_bus').value = r.drop_bus_no||'';
     el('st_pickup_stop').value = r.pickup_stoppage||'';
     el('st_drop_stop').value = r.drop_stoppage||'';
-    el('st_has_sibling').value = r.has_sibling ? 'true':'false';
-    if (r.has_sibling){ el('sib_yes').checked = true; } else { el('sib_no').checked = true; }
-    document.getElementById('sib_details').classList.toggle('hidden', !r.has_sibling);
+    // Siblings
+    el('st_sibling_select').value = r.has_sibling ? 'true' : 'false';
+    syncSiblingUI();
     el('st_siblings').value = (r.sibling_names||[]).join('; ');
-    el('st_guardian_email').value = '';
-    el('st_msg').textContent = 'Editing mode — make changes and press Save.';
+    // Others
+    el('st_mother_phone').value = r.mother_contact_no||'';
+    el('st_neigh_phone').value = r.neighbour_contact_no||'';
+    el('st_neigh_rel').value = r.neighbour_relation||'';
+    el('st_bgroup').value = r.blood_group||'';
+    el('st_guardian_email').value = r.guardian_email||'';
   }
 
   async function saveStudent(){
     const v = readForm();
-    syncTransportRadios();
-    if (el('st_same_bus').checked) v.drop_bus_no = v.pickup_bus_no;
-    if (el('st_same_stop').checked) v.drop_stoppage = v.pickup_stoppage;
-    if (el('sib_yes').checked) v.has_sibling = true; else { v.has_sibling = false; v.sibling_names = null; }
     if(!validate(v)) return;
+    // link guardian if provided
+    v.guardian_user_id = await linkGuardian(v.guardian_email);
 
-    const guardian_user_id = await linkGuardian(v.guardian_email);
-    delete v.guardian_email;
-
-    const payload = { ...v, guardian_user_id };
-    const { data:{ user } } = await sb.auth.getUser();
     let res;
-    if (editingId){
-      payload.updated_by = user.id;
-      res = await sb.from('students').update(payload).eq('id', editingId).select().single();
-      el('st_msg').textContent = res.error ? ('Error: '+res.error.message) : 'Updated successfully';
-      el('st_msg').className = res.error ? 'muted err':'muted ok';
+    if(editingId){
+      res = await sb.from('students').update(v).eq('id', editingId).select('id').single();
     } else {
-      payload.created_by = user.id;
-      res = await sb.from('students').insert(payload).select().single();
-      el('st_msg').textContent = res.error ? ('Error: '+res.error.message) : 'Added successfully';
-      el('st_msg').className = res.error ? 'muted err':'muted ok';
+      res = await sb.from('students').insert(v).select('id').single();
     }
+    el('st_msg').textContent = res.error ? ('Error: '+res.error.message) : (editingId?'Updated.':'Added successfully');
+    el('st_msg').className = res.error ? 'muted err' : 'muted ok';
     if (!res.error){ clearForm(); listStudents(); }
   }
 
   function clearForm(){
     editingId = null;
-    ['st_admission_no','st_class_section','st_full_name','st_session','st_father_name','st_mother_name','st_dob','st_admission_date','st_gender','st_aadhar','st_religion','st_social','st_whatsapp','st_father_phone','st_address','st_pickup_bus','st_drop_bus','st_pickup_stop','st_drop_stop','st_mother_phone','st_neigh_phone','st_neigh_rel','st_bgroup','st_siblings','st_guardian_email'].forEach(id=>{
-      const e=el(id); if(e) e.value='';
-    });
+    ['st_admission_no','st_class_section','st_full_name','st_session','st_father_name','st_mother_name','st_dob','st_admission_date','st_gender','st_aadhar','st_religion','st_social','st_whatsapp','st_father_phone','st_address','st_pickup_bus','st_drop_bus','st_pickup_stop','st_drop_stop','st_mother_phone','st_neigh_phone','st_neigh_rel','st_bgroup','st_siblings','st_guardian_email'].forEach(id=>{ const e=el(id); if(e) e.value=''; });
     el('st_class').value='';
-    el('tr_no').checked = true; syncTransportRadios();
+    el('st_transport_select').value='false'; syncTransportUI();
     el('st_same_bus').checked=false; el('st_same_stop').checked=false;
-    el('sib_no').checked = true; document.getElementById('sib_details').classList.add('hidden');
+    el('st_sibling_select').value='false'; syncSiblingUI();
     el('st_msg').textContent='';
   }
 
@@ -345,12 +342,12 @@
   document.getElementById('st_save').onclick = saveStudent;
   document.getElementById('st_clear').onclick = clearForm;
   document.getElementById('st_search').oninput = listStudents;
-  document.getElementById('tr_yes').addEventListener('change', syncTransportRadios);
-  document.getElementById('tr_no').addEventListener('change', syncTransportRadios);
+  document.getElementById('st_transport_select').addEventListener('change', syncTransportUI);
   document.getElementById('st_same_bus').addEventListener('change', syncSameBus);
   document.getElementById('st_same_stop').addEventListener('change', syncSameStop);
+  document.getElementById('st_sibling_select').addEventListener('change', syncSiblingUI);
 
-  (async()=>{ await ensureRole('accounts'); syncTransportRadios(); await listStudents(); })();
+  (async()=>{ await ensureRole('accounts'); syncTransportUI(); syncSiblingUI(); await listStudents(); })();
 </script>
 </body>
 </html>
